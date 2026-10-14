@@ -4,13 +4,15 @@
 
 AgentBarrage 将 Codex、Claude Code、CodeBuddy Code 等本机智能体的工作状态显示为 macOS 桌面弹幕。不同工具通过独立适配器接入同一事件协议；内置适配器只发送预设短句和经过筛选的详情。
 
-**当前状态：正式程序可从源码运行；项目计划在 GitHub 公开源码，暂无 `.app` 安装包发布计划。** 原生悬浮窗、接入管理、样式设置、内存历史、三个 Hook 适配器和本机发送命令已经实现。Codex Hook 已在本机实际触发并显示。Claude Code 与 CodeBuddy Code 的适配器通过模拟 Hook 输入验证，真实产品覆盖仍需验收。CodeBuddy 桌面版/IDE 的实际接入方式仍需验证。
+**当前状态：源码已在 [GitHub](https://github.com/MEDADA/AgentBarrage) 开源，可从源码运行；暂无 `.app` 安装包发布计划。** 原生悬浮窗、接入管理、样式设置、内存历史、三个 Hook 适配器和本机发送命令已经实现。Codex Hook 已在本机实际触发并显示。Claude Code 与 CodeBuddy Code 的适配器通过模拟 Hook 输入验证，真实产品覆盖仍需验收。CodeBuddy 桌面版/IDE 的实际接入方式仍需验证。
 
 ## 在 macOS 启动
 
-需要 macOS、Python 3.11 或更新版本。在项目根目录运行：
+需要 macOS、Python 3.11 或更新版本。克隆仓库后运行：
 
 ```sh
+git clone https://github.com/MEDADA/AgentBarrage.git
+cd AgentBarrage
 python3 -m venv .venv
 ./.venv/bin/python -m pip install '.[macos]'
 ./.venv/bin/agent-barrage
