@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+build/
+demo/settings.json
+.venv/
+.DS_Store
+dist/
+*.egg-info/
+packaging/macos/AgentBarrage.icns

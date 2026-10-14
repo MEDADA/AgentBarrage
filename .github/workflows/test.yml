@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install .
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q agent_barrage demo tests
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install '.[macos]'
+      - run: python -c 'import AppKit'
+      - run: agent-barrage --help
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q agent_barrage demo tests
+      - run: python -m pip install pyinstaller pillow
+      - run: sh packaging/macos/build.sh
+      - run: python packaging/macos/smoke.py

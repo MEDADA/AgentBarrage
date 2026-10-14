@@ -1,0 +1,2 @@
+# GUI dependency. The core, adapters, CLI and tests use the Python standard library.
+pyobjc-framework-Cocoa>=10,<13
