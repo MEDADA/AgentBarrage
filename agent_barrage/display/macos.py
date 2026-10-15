@@ -25,13 +25,13 @@ INTEGRATIONS = [
 ]
 
 PALETTE = {
-    "working": ((0.30, 0.78, 1.00), "●"),
-    "success": ((0.42, 0.91, 0.66), "✓"),
-    "attention": ((1.00, 0.72, 0.34), "!"),
-    "error": ((1.00, 0.43, 0.47), "×"),
+    "working": (0.30, 0.78, 1.00),
+    "success": (0.42, 0.91, 0.66),
+    "attention": (1.00, 0.72, 0.34),
+    "error": (1.00, 0.43, 0.47),
 }
 def tint(kind, alpha=1):
-    red, green, blue = PALETTE[kind][0]
+    red, green, blue = PALETTE[kind]
     return NSColor.colorWithCalibratedRed_green_blue_alpha_(red, green, blue, alpha)
 
 
@@ -79,6 +79,23 @@ def typeface(size, weight=NSFontWeightSemibold):
     return NSFont.systemFontOfSize_weight_(size, weight)
 
 
+def barrage_font(size, role, family):
+    weights = {"source": NSFontWeightSemibold, "project": NSFontWeightRegular,
+               "message": NSFontWeightMedium}
+    names = {
+        "苹方": ("PingFangSC-Regular", "PingFangSC-Medium", "PingFangSC-Semibold"),
+        "冬青": ("HiraginoSansGB-W3", "HiraginoSansGB-W3", "HiraginoSansGB-W6"),
+        "宋体": ("STSongti-SC-Regular", "STSongti-SC-Regular", "STSongti-SC-Bold"),
+        "华文黑体": ("STHeitiSC-Light", "STHeitiSC-Medium", "STHeitiSC-Medium"),
+    }
+    if family in names:
+        index = {"project": 0, "message": 1, "source": 2}[role]
+        font = NSFont.fontWithName_size_(names[family][index], size)
+        if font is not None:
+            return font
+    return typeface(size, weights[role])
+
+
 def measure(text, face):
     return NSString.stringWithString_(text).sizeWithAttributes_({NSFontAttributeName: face}).width
 
@@ -94,6 +111,21 @@ def fit_text(value, face, limit):
         else:
             high = middle - 1
     return value[:low] + "…"
+
+
+def draw_barrage_text(value, point, face, foreground, settings, opacity):
+    text = NSString.stringWithString_(value)
+    if settings["outline_enabled"]:
+        # A positive width draws only the stroke. Cover its inner half with a
+        # second fill pass, leaving the requested width outside the glyph.
+        text.drawAtPoint_withAttributes_(point, {
+            NSFontAttributeName: face,
+            NSStrokeColorAttributeName: color_from_hex(settings["outline_color"], opacity),
+            NSStrokeWidthAttributeName: 200 * settings["outline_width"] / face.pointSize(),
+        })
+    text.drawAtPoint_withAttributes_(point, {
+        NSFontAttributeName: face, NSForegroundColorAttributeName: foreground,
+    })
 
 
 class Canvas(NSView):
@@ -115,16 +147,29 @@ class Canvas(NSView):
             icon = None
         message = "有一条新动态" if self.privacy else message
         size = int(self.settings["font_size"])
-        if not self.settings["show_icons"]:
+        style = self.settings["style"]
+        if style == "纯文字" or not self.settings["show_icons"]:
             icon = None
+        source, separator, project = source.partition(" · ")
+        if not separator:
+            project = ""
         icon_offset = 24 if icon is not None else 0
+        padding = 13 if style != "纯文字" else 0
+        gap = 10
         max_width = max(240, self.bounds().size.width - 48)
-        source_face = typeface(size - 3, NSFontWeightBold)
-        message_face = typeface(size)
-        source = fit_text(source, source_face, max(80, max_width * 0.42))
+        family = self.settings["font_family"]
+        source_face = barrage_font(size - 3, "source", family)
+        project_face = barrage_font(size - 4, "project", family)
+        message_face = barrage_font(size, "message", family)
+        source = fit_text(source, source_face, max(58, max_width * 0.18))
+        if project:
+            project = fit_text(project, project_face, max(70, max_width * 0.25))
+        content_width = max_width - 2 * padding - icon_offset - gap * (2 if project else 1)
         message = fit_text(message, message_face,
-                           max(80, max_width - 78 - icon_offset - measure(source, source_face)))
-        width = measure(source, source_face) + measure(message, message_face) + 78 + icon_offset
+                           max(24, content_width - measure(source, source_face) - measure(project, project_face)))
+        width = (2 * padding + icon_offset + measure(source, source_face) +
+                 measure(project, project_face) + measure(message, message_face) +
+                 gap * (2 if project else 1))
         gap = int(self.settings["spacing"])
         region = self.settings["region"]
         height = self.bounds().size.height
@@ -143,7 +188,7 @@ class Canvas(NSView):
             if drop_index is None and kind == "working":
                 return
             self.items.pop(drop_index if drop_index is not None else 0)
-        self.items.append([x, y, width, source, message, kind, speed, icon, remaining])
+        self.items.append([x, y, width, source, message, kind, speed, icon, remaining, project])
         self.setNeedsDisplay_(True)
 
     @objc.python_method
@@ -160,9 +205,9 @@ class Canvas(NSView):
             self.setNeedsDisplay_(True)
 
     def drawRect_(self, rect):
-        for x, y, width, source, message, kind, speed, icon, remaining in self.items:
+        for x, y, width, source, message, kind, speed, icon, remaining, project in self.items:
             size = int(self.settings["font_size"])
-            pill_height = size + 23
+            pill_height = size + 18
             style = self.settings["style"]
             opacity = float(self.settings["opacity"])
             if style != "纯文字":
@@ -177,22 +222,26 @@ class Canvas(NSView):
                     bubble.stroke()
             baseline = y + (pill_height - size) / 2 - 2
             foreground = color_from_hex(self.settings["text_color"], opacity)
-            if style != "纯文字":
-                circle = NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(x + 12 + (24 if icon else 0), y + (pill_height - 19) / 2, 19, 19))
-                tint(kind, 0.23).setFill()
-                circle.fill()
+            cursor = x + (13 if style != "纯文字" else 0)
             if icon is not None:
                 icon.drawInRect_fromRect_operation_fraction_(
-                    NSMakeRect(x + 11, y + (pill_height - 20) / 2, 20, 20),
+                    NSMakeRect(cursor, y + (pill_height - 16) / 2, 16, 16),
                     NSZeroRect, NSCompositingOperationSourceOver, opacity)
-            offset = 24 if icon is not None else 0
-            NSString.stringWithString_(PALETTE[kind][1]).drawAtPoint_withAttributes_(
-                (x + 17 + offset, baseline), {NSFontAttributeName: typeface(size - 1, NSFontWeightHeavy), NSForegroundColorAttributeName: tint(kind, opacity)})
-            NSString.stringWithString_(source).drawAtPoint_withAttributes_(
-                (x + 38 + offset, baseline + 1), {NSFontAttributeName: typeface(size - 3, NSFontWeightBold), NSForegroundColorAttributeName: foreground})
-            NSString.stringWithString_(message).drawAtPoint_withAttributes_(
-                (x + 48 + offset + measure(source, typeface(size - 3, NSFontWeightBold)), baseline - 2),
-                {NSFontAttributeName: typeface(size), NSForegroundColorAttributeName: foreground})
+                cursor += 24
+            family = self.settings["font_family"]
+            source_face = barrage_font(size - 3, "source", family)
+            project_face = barrage_font(size - 4, "project", family)
+            message_face = barrage_font(size, "message", family)
+            draw_barrage_text(source, (cursor, baseline + 1), source_face,
+                              tint(kind, opacity), self.settings, opacity)
+            cursor += measure(source, source_face) + 10
+            if project:
+                draw_barrage_text(project, (cursor, baseline + 1), project_face,
+                                  color_from_hex(self.settings["text_color"], opacity * 0.66),
+                                  self.settings, opacity * 0.66)
+                cursor += measure(project, project_face) + 10
+            draw_barrage_text(message, (cursor, baseline - 2), message_face,
+                              foreground, self.settings, opacity)
 
 
 class Controller(NSObject):
@@ -603,28 +652,56 @@ class Controller(NSObject):
         self.label(content, "弹幕设置", 18, 674, True)
         self.label(content, "调整后即时预览，并自动保存", 11, 651)
         self.label(content, "样式", 12, 610, True)
-        self.style_popup = self.popup(content, ["胶囊", "轻盈", "纯文字"], self.settings["style"], 604)
-        self.label(content, "文字颜色", 12, 573, True)
-        self.text_color_well = NSColorWell.alloc().initWithFrame_(NSMakeRect(119, 567, 251, 28))
+        self.style_popup = self.popup(content, ["胶囊", "轻盈", "纯文字"], self.settings["style"], 604, width=110)
+        self.label(content, "字体", 12, 610, True, x=236, width=38)
+        self.font_popup = self.popup(content, ["苹方", "系统", "冬青", "宋体", "华文黑体"],
+                                     self.settings["font_family"], 604, x=276, width=94)
+        self.label(content, "文字颜色", 12, 575, True)
+        self.text_color_well = NSColorWell.alloc().initWithFrame_(NSMakeRect(119, 569, 251, 28))
         self.text_color_well.setColor_(color_from_hex(self.settings["text_color"]))
         self.text_color_well.setTarget_(self)
         self.text_color_well.setAction_("settingsChanged:")
         content.addSubview_(self.text_color_well)
-        self.label(content, "区域", 12, 533, True)
-        self.region_popup = self.popup(content, ["顶部", "中部", "底部"], self.settings["region"], 527)
-        self.label(content, "显示器", 12, 493, True)
-        self.screen_popup = self.popup(content, ["所有屏幕", "主屏幕"], self.settings["screens"], 487)
-        self.label(content, "播放方式", 12, 453, True)
-        self.motion_popup = self.popup(content, ["滚动", "固定停留"], self.settings["motion"], 447)
+        self.label(content, "文字描边", 12, 537, True)
+        self.outline_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(119, 532, 24, 24))
+        self.outline_checkbox.setButtonType_(NSSwitchButton)
+        self.outline_checkbox.setTitle_("")
+        self.outline_checkbox.setAccessibilityLabel_("启用文字描边")
+        self.outline_checkbox.setState_(NSControlStateValueOn if self.settings["outline_enabled"] else NSControlStateValueOff)
+        self.outline_checkbox.setTarget_(self)
+        self.outline_checkbox.setAction_("settingsChanged:")
+        content.addSubview_(self.outline_checkbox)
+        self.label(content, "启用", 11, 532, x=143, width=38)
+        self.outline_color_well = NSColorWell.alloc().initWithFrame_(NSMakeRect(184, 531, 90, 28))
+        self.outline_color_well.setColor_(color_from_hex(self.settings["outline_color"]))
+        self.outline_color_well.setAccessibilityLabel_("描边颜色")
+        self.outline_color_well.setTarget_(self)
+        self.outline_color_well.setAction_("settingsChanged:")
+        content.addSubview_(self.outline_color_well)
+        self.outline_width_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(281, 531, 89, 28), False)
+        self.outline_width_popup.addItemsWithTitles_(["0.5 px", "1 px", "1.5 px"])
+        self.outline_width_popup.selectItemAtIndex_(min(range(3), key=lambda index:
+            abs((0.5, 1.0, 1.5)[index] - self.settings["outline_width"])))
+        self.outline_width_popup.setAccessibilityLabel_("描边粗细")
+        self.outline_width_popup.setTarget_(self)
+        self.outline_width_popup.setAction_("settingsChanged:")
+        content.addSubview_(self.outline_width_popup)
+        self.refresh_outline_controls()
+        self.label(content, "区域", 12, 501, True)
+        self.region_popup = self.popup(content, ["顶部", "中部", "底部"], self.settings["region"], 495)
+        self.label(content, "显示器", 12, 465, True)
+        self.screen_popup = self.popup(content, ["所有屏幕", "主屏幕"], self.settings["screens"], 459)
+        self.label(content, "播放方式", 12, 429, True)
+        self.motion_popup = self.popup(content, ["滚动", "固定停留"], self.settings["motion"], 423)
         self.slider_values = {}
-        self.font_slider = self.slider_row(content, "字号", 413, 12, 22, self.settings["font_size"])
-        self.speed_slider = self.slider_row(content, "滚动速度", 376, 0.5, 2.0, self.settings["speed"])
-        self.opacity_slider = self.slider_row(content, "透明度", 339, 0.4, 1.0, self.settings["opacity"])
-        self.spacing_slider = self.slider_row(content, "行间距", 302, 42, 80, self.settings["spacing"])
-        self.coverage_slider = self.slider_row(content, "区域占比", 265, 0.2, 0.8, self.settings["coverage"])
-        self.density_slider = self.slider_row(content, "同屏密度", 228, 1, 12, self.settings["density"])
-        self.duration_slider = self.slider_row(content, "固定时长", 191, 2, 10, self.settings["fixed_duration"])
-        self.icons_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(119, 154, 24, 24))
+        self.font_slider = self.slider_row(content, "字号", 393, 12, 22, self.settings["font_size"])
+        self.speed_slider = self.slider_row(content, "滚动速度", 358, 0.5, 2.0, self.settings["speed"])
+        self.opacity_slider = self.slider_row(content, "透明度", 323, 0.4, 1.0, self.settings["opacity"])
+        self.spacing_slider = self.slider_row(content, "行间距", 288, 42, 80, self.settings["spacing"])
+        self.coverage_slider = self.slider_row(content, "区域占比", 253, 0.2, 0.8, self.settings["coverage"])
+        self.density_slider = self.slider_row(content, "同屏密度", 218, 1, 12, self.settings["density"])
+        self.duration_slider = self.slider_row(content, "固定时长", 183, 2, 10, self.settings["fixed_duration"])
+        self.icons_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(119, 150, 24, 24))
         self.icons_checkbox.setButtonType_(NSSwitchButton)
         self.icons_checkbox.setTitle_("")
         self.icons_checkbox.setAccessibilityLabel_("显示来源图标")
@@ -632,8 +709,8 @@ class Controller(NSObject):
         self.icons_checkbox.setTarget_(self)
         self.icons_checkbox.setAction_("settingsChanged:")
         content.addSubview_(self.icons_checkbox)
-        self.label(content, "显示来源图标", 12, 153, x=150, width=115)
-        self.motion_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(265, 154, 24, 24))
+        self.label(content, "图标（非纯文字）", 11, 149, x=150, width=115)
+        self.motion_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(265, 150, 24, 24))
         self.motion_checkbox.setButtonType_(NSSwitchButton)
         self.motion_checkbox.setTitle_("")
         self.motion_checkbox.setAccessibilityLabel_("减少动态效果")
@@ -641,9 +718,9 @@ class Controller(NSObject):
         self.motion_checkbox.setTarget_(self)
         self.motion_checkbox.setAction_("settingsChanged:")
         content.addSubview_(self.motion_checkbox)
-        self.label(content, "减少动画", 11, 153, x=290, width=90)
-        self.label(content, "类型过滤", 12, 117, True)
-        self.filter_popup = self.popup(content, ["全部类型", "隐藏工作", "只看需处理"], self.settings["event_filter"], 111)
+        self.label(content, "减少动画", 11, 149, x=290, width=90)
+        self.label(content, "类型过滤", 12, 115, True)
+        self.filter_popup = self.popup(content, ["全部类型", "隐藏工作", "只看需处理"], self.settings["event_filter"], 109)
         self.label(content, "内容", 12, 77, True)
         self.content_popup = self.popup(content, ["简洁摘要", "部分详情"], self.settings["content"], 71)
         self.label(content, "进度弹幕", 12, 40, True)
@@ -652,8 +729,8 @@ class Controller(NSObject):
         self.settings_window.makeKeyAndOrderFront_(None)
 
     @objc.python_method
-    def popup(self, content, values, selected, y):
-        control = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(119, y, 251, 28), False)
+    def popup(self, content, values, selected, y, x=119, width=251):
+        control = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(x, y, width, 28), False)
         control.addItemsWithTitles_(values)
         control.selectItemWithTitle_(selected)
         control.setTarget_(self)
@@ -687,6 +764,12 @@ class Controller(NSObject):
         }
         for title, value in values.items():
             self.slider_values[title].setStringValue_(value)
+
+    @objc.python_method
+    def refresh_outline_controls(self):
+        enabled = self.outline_checkbox.state() == NSControlStateValueOn
+        self.outline_color_well.setEnabled_(enabled)
+        self.outline_width_popup.setEnabled_(enabled)
 
     @objc.python_method
     def emit(self, source, message, kind, origin="模拟", detail="", agent_id=None, open_url=""):
@@ -957,9 +1040,14 @@ class Controller(NSObject):
     @objc.typedSelector(b"v@:@")
     def settingsChanged_(self, sender):
         self.refresh_slider_values()
+        self.refresh_outline_controls()
         self.settings = {
             "style": self.style_popup.titleOfSelectedItem(),
+            "font_family": self.font_popup.titleOfSelectedItem(),
             "text_color": color_to_hex(self.text_color_well.color()),
+            "outline_enabled": self.outline_checkbox.state() == NSControlStateValueOn,
+            "outline_color": color_to_hex(self.outline_color_well.color()),
+            "outline_width": (0.5, 1.0, 1.5)[self.outline_width_popup.indexOfSelectedItem()],
             "region": self.region_popup.titleOfSelectedItem(),
             "screens": self.screen_popup.titleOfSelectedItem(),
             "motion": self.motion_popup.titleOfSelectedItem(),

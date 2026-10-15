@@ -171,25 +171,43 @@ class HookBridgeTest(unittest.TestCase):
             legacy.write_text('{"style":"纯文字","progress":"全部","font_size":999}', encoding="utf-8")
             settings = load_settings(current, legacy)
             self.assertEqual(settings["style"], "纯文字")
+            self.assertEqual(settings["font_family"], "苹方")
             self.assertEqual(settings["font_size"], 16)
             self.assertEqual(settings["text_color"], "#FFFFFF")
+            self.assertFalse(settings["outline_enabled"])
+            self.assertEqual(settings["outline_color"], "#141A26")
+            self.assertEqual(settings["outline_width"], 0.5)
             self.assertEqual(settings["motion"], "滚动")
             self.assertTrue(settings["show_icons"])
             self.assertEqual(settings["event_filter"], "全部类型")
             self.assertTrue(current.exists())
             settings["progress"] = "精简"
             settings["text_color"] = "#141A26"
+            settings["outline_enabled"] = True
+            settings["outline_color"] = "#F0A070"
+            settings["outline_width"] = 1.5
+            settings["font_family"] = "宋体"
             settings["motion"] = "固定停留"
             settings["density"] = 4
             settings["show_icons"] = False
             save_settings(settings, current)
             self.assertEqual(load_settings(current, legacy)["progress"], "精简")
             self.assertEqual(load_settings(current, legacy)["text_color"], "#141A26")
+            self.assertTrue(load_settings(current, legacy)["outline_enabled"])
+            self.assertEqual(load_settings(current, legacy)["outline_color"], "#F0A070")
+            self.assertEqual(load_settings(current, legacy)["outline_width"], 1.5)
+            self.assertEqual(load_settings(current, legacy)["font_family"], "宋体")
             self.assertEqual(load_settings(current, legacy)["motion"], "固定停留")
             self.assertEqual(load_settings(current, legacy)["density"], 4)
             self.assertFalse(load_settings(current, legacy)["show_icons"])
             current.write_text('{"text_color":"暖黄"}', encoding="utf-8")
             self.assertEqual(load_settings(current, legacy)["text_color"], "#FFE073")
+            current.write_text('{"outline_enabled":"yes","outline_color":"invalid","outline_width":99,"font_family":"unknown"}', encoding="utf-8")
+            invalid = load_settings(current, legacy)
+            self.assertFalse(invalid["outline_enabled"])
+            self.assertEqual(invalid["outline_color"], "#141A26")
+            self.assertEqual(invalid["outline_width"], 0.5)
+            self.assertEqual(invalid["font_family"], "苹方")
 
     def test_custom_sources_are_named_and_reversible(self):
         with tempfile.TemporaryDirectory() as directory:
