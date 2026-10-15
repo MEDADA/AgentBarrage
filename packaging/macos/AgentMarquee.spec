@@ -6,7 +6,7 @@ ROOT = Path(SPECPATH).resolve().parents[1]
 
 
 a = Analysis(
-    [str(ROOT / 'bin' / 'agent-barrage')],
+    [str(ROOT / 'bin' / 'agent-marquee')],
     pathex=[str(ROOT)],
     binaries=[],
     datas=[],
@@ -25,7 +25,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AgentBarrage',
+    name='AgentMarquee',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -44,13 +44,13 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='AgentBarrage',
+    name='AgentMarquee',
 )
 app = BUNDLE(
     coll,
-    name='AgentBarrage.app',
-    icon=str(ROOT / 'packaging' / 'macos' / 'AgentBarrage.icns'),
-    bundle_identifier='io.github.agentbarrage.AgentBarrage',
+    name='AgentMarquee.app',
+    icon=str(ROOT / 'packaging' / 'macos' / 'AgentMarquee.icns'),
+    bundle_identifier='io.github.agentmarquee.AgentMarquee',
     info_plist={'LSUIElement': True, 'NSHighResolutionCapable': True,
-                'CFBundleDisplayName': 'AgentBarrage'},
+                'CFBundleDisplayName': 'AgentMarquee'},
 )

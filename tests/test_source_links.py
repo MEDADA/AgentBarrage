@@ -1,8 +1,8 @@
 import unittest
 
-from agent_barrage.core.events import make_event, valid_event
-from agent_barrage.core.history import HistoryStore
-from agent_barrage.core.settings import sanitize_settings
+from agent_marquee.core.events import make_event, valid_event
+from agent_marquee.core.history import HistoryStore
+from agent_marquee.core.settings import sanitize_settings
 
 
 class SourceLinksTest(unittest.TestCase):

@@ -9,15 +9,15 @@ from pathlib import Path
 import objc
 from AppKit import *
 from Foundation import NSObject, NSString, NSTimer, NSURL
-from agent_barrage.core.spool import drain, ensure_spool
-from agent_barrage.core.history import HistoryStore
-from agent_barrage.core.progress import ProgressGate
-from agent_barrage.core.traffic import TrafficGate, prioritize
-from agent_barrage.core.settings import DEFAULT_SETTINGS, load_settings, save_settings
-from agent_barrage.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
-from agent_barrage.core.events import make_event
-from agent_barrage.core.spool import publish
-from agent_barrage.install import CONFIG_PATHS, apply_agent, integration_status
+from agent_marquee.core.spool import drain, ensure_spool
+from agent_marquee.core.history import HistoryStore
+from agent_marquee.core.progress import ProgressGate
+from agent_marquee.core.traffic import TrafficGate, prioritize
+from agent_marquee.core.settings import DEFAULT_SETTINGS, load_settings, save_settings
+from agent_marquee.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
+from agent_marquee.core.events import make_event
+from agent_marquee.core.spool import publish
+from agent_marquee.install import CONFIG_PATHS, apply_agent, integration_status
 from .icons import IconResolver
 
 INTEGRATIONS = [
@@ -350,7 +350,7 @@ class Controller(NSObject):
                            screen.origin.y + screen.size.height - height - 30, 350, height)
         style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
         self.control = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(frame, style, NSBackingStoreBuffered, False)
-        self.control.setTitle_("AgentBarrage · 演示" if self.demo_mode else "AgentBarrage")
+        self.control.setTitle_("AgentMarquee · 演示" if self.demo_mode else "AgentMarquee")
         self.control.setLevel_(NSStatusWindowLevel + 1)
         self.control.setCollectionBehavior_(NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary)
         self.control.setReleasedWhenClosed_(False)
@@ -358,7 +358,7 @@ class Controller(NSObject):
         self.control.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.08, 0.10, 0.15, 1))
         content = self.control.contentView()
         if self.demo_mode:
-            self.label(content, "AGENT BARRAGE", 19, 300, True)
+            self.label(content, "AGENT MARQUEE", 19, 300, True)
             self.label(content, "演示模式 · 下方按钮使用模拟数据", 11, 275)
             self.status = self.label(content, "● 等待智能体事件", 12, 246)
             self.label(content, "模拟事件", 11, 215, True)
@@ -370,7 +370,7 @@ class Controller(NSObject):
             self.pause_button = self.button(content, "暂停", 100, "togglePause:", 126, 98)
             self.privacy_button = self.button(content, "隐私模式", 100, "togglePrivacy:", 232, 98)
         else:
-            self.label(content, "AGENT BARRAGE", 19, 195, True)
+            self.label(content, "AGENT MARQUEE", 19, 195, True)
             self.label(content, "监听本机智能体事件", 11, 170)
             self.status = self.label(content, "● 等待智能体事件", 12, 140)
             self.pause_button = self.button(content, "暂停", 98, "togglePause:", 20, 150)
@@ -385,8 +385,8 @@ class Controller(NSObject):
     def build_status_item(self):
         self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(NSVariableStatusItemLength)
         self.status_item.button().setImage_(status_icon())
-        self.status_item.button().setToolTip_("AgentBarrage · 弹幕通知")
-        menu = NSMenu.alloc().initWithTitle_("AgentBarrage")
+        self.status_item.button().setToolTip_("AgentMarquee · 弹幕通知")
+        menu = NSMenu.alloc().initWithTitle_("AgentMarquee")
         for title, action in (("显示控制窗", "openControl:"),
                               ("弹幕设置", "openSettings:"),
                               ("历史记录", "openHistory:"),
@@ -402,7 +402,7 @@ class Controller(NSObject):
         self.menu_privacy_item.setTarget_(self)
         menu.addItem_(self.menu_privacy_item)
         menu.addItem_(NSMenuItem.separatorItem())
-        quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("退出 AgentBarrage", "quitApp:", "")
+        quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("退出 AgentMarquee", "quitApp:", "")
         quit_item.setTarget_(self)
         menu.addItem_(quit_item)
         self.status_item.setMenu_(menu)
@@ -578,13 +578,13 @@ class Controller(NSObject):
         if source_id is None:
             self.custom_command.setString_("添加来源后，这里会给出可复制的接入命令。")
             return
-        checkout_script = Path(__file__).resolve().parents[2] / "bin" / "agent-barrage-send"
+        checkout_script = Path(__file__).resolve().parents[2] / "bin" / "agent-marquee-send"
         if getattr(sys, "frozen", False):
             prefix = f"{shlex.quote(sys.executable)} --send"
         elif checkout_script.is_file():
             prefix = f"/usr/bin/env python3 {shlex.quote(str(checkout_script))}"
         else:
-            prefix = shlex.quote(str(Path(sys.executable).parent / "agent-barrage-send"))
+            prefix = shlex.quote(str(Path(sys.executable).parent / "agent-marquee-send"))
         self.custom_command.setString_(
             f'{prefix} --agent {source_id} --kind success --message "回答已完成" --project "对话"')
 
@@ -829,13 +829,13 @@ class Controller(NSObject):
         self.refresh()
 
     @objc.typedSelector(b"v@:@")
-    def sendWorking_(self, sender): self.emit("CODEX · AgentBarrage", "正在生成界面并检查效果", "working", detail="macos.py")
+    def sendWorking_(self, sender): self.emit("CODEX · AgentMarquee", "正在生成界面并检查效果", "working", detail="macos.py")
     @objc.typedSelector(b"v@:@")
-    def sendAttention_(self, sender): self.emit("CODEX · AgentBarrage", "需要批准：运行终端命令", "attention")
+    def sendAttention_(self, sender): self.emit("CODEX · AgentMarquee", "需要批准：运行终端命令", "attention")
     @objc.typedSelector(b"v@:@")
-    def sendSuccess_(self, sender): self.emit("CODEX · AgentBarrage", "任务已完成，可以查看结果", "success")
+    def sendSuccess_(self, sender): self.emit("CODEX · AgentMarquee", "任务已完成，可以查看结果", "success")
     @objc.typedSelector(b"v@:@")
-    def sendError_(self, sender): self.emit("CODEX · AgentBarrage", "执行失败，请查看任务详情", "error")
+    def sendError_(self, sender): self.emit("CODEX · AgentMarquee", "执行失败，请查看任务详情", "error")
 
     @objc.typedSelector(b"v@:@")
     def toggleAuto_(self, sender):
@@ -862,7 +862,7 @@ class Controller(NSObject):
             canvas.setNeedsDisplay_(True)
         self.privacy_button.setTitle_("隐私: 开" if self.privacy else "隐私模式")
         self.refresh()
-        self.emit("AGENT BARRAGE", "隐私模式已切换", "success", origin="系统")
+        self.emit("AGENT MARQUEE", "隐私模式已切换", "success", origin="系统")
 
     @objc.typedSelector(b"v@:@")
     def openHistory_(self, sender):
@@ -1066,14 +1066,14 @@ class Controller(NSObject):
         }
         save_settings(self.settings)
         self.rebuild_overlays()
-        self.emit("CODEX · AgentBarrage", "弹幕样式预览", "success", origin="预览", agent_id="codex")
+        self.emit("CODEX · AgentMarquee", "弹幕样式预览", "success", origin="预览", agent_id="codex")
 
     def windowWillClose_(self, notification):
         pass
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="AgentBarrage macOS desktop overlay")
+    parser = argparse.ArgumentParser(description="AgentMarquee macOS desktop overlay")
     parser.add_argument("--demo", action="store_true", help="show simulated event controls")
     args = parser.parse_args(argv)
     app = NSApplication.sharedApplication()

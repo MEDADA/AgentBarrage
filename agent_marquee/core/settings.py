@@ -5,8 +5,9 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from .migration import DATA_DIR, migrate_user_data
 
-SETTINGS_PATH = Path.home() / "Library" / "Application Support" / "AgentBarrage" / "settings.json"
+SETTINGS_PATH = DATA_DIR / "settings.json"
 LEGACY_PATH = Path(__file__).resolve().parents[2] / "demo" / "settings.json"
 DEFAULT_SETTINGS = {
     "style": "胶囊", "font_family": "苹方", "region": "顶部", "font_size": 16, "speed": 1.0,
@@ -64,6 +65,8 @@ def sanitize_settings(saved):
 
 
 def load_settings(path=SETTINGS_PATH, legacy_path=LEGACY_PATH):
+    if path == SETTINGS_PATH:
+        migrate_user_data()
     source = path if path.exists() else legacy_path
     try:
         saved = json.loads(source.read_text(encoding="utf-8"))

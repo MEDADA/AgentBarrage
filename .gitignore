@@ -6,4 +6,5 @@ demo/settings.json
 .DS_Store
 dist/
 *.egg-info/
+packaging/macos/AgentMarquee.icns
 packaging/macos/AgentBarrage.icns

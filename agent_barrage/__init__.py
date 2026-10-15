@@ -1,1 +1,1 @@
-"""AgentBarrage shared event protocol and adapters."""
+"""Compatibility entry points for AgentBarrage integrations."""

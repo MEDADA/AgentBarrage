@@ -6,6 +6,6 @@ cd "$PROJECT_ROOT"
 
 python3 packaging/macos/make_icon.py
 pyinstaller --noconfirm --clean --distpath dist --workpath build/pyinstaller \
-  packaging/macos/AgentBarrage.spec
+  packaging/macos/AgentMarquee.spec
 
-printf 'Built %s\n' "$PROJECT_ROOT/dist/AgentBarrage.app"
+printf 'Built %s\n' "$PROJECT_ROOT/dist/AgentMarquee.app"

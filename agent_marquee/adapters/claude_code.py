@@ -1,6 +1,6 @@
 """Claude Code command hook adapter; uses only event metadata."""
 
-from agent_barrage.core.events import make_event, with_detail
+from agent_marquee.core.events import make_event, with_detail
 from .details import tool_detail
 
 

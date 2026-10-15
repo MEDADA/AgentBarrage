@@ -1,6 +1,6 @@
 import unittest
 
-from agent_barrage.core.traffic import TrafficGate, prioritize
+from agent_marquee.core.traffic import TrafficGate, prioritize
 
 
 def event(kind="working", message="正在工作", session="one", name="PreToolUse"):

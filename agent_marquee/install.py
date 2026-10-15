@@ -25,7 +25,7 @@ CONFIG_PATHS = {
     "claude-code": Path.home() / ".claude" / "settings.json",
     "codebuddy": Path.home() / ".codebuddy" / "settings.json",
 }
-EMITTER_PATH = Path(__file__).resolve().parents[1] / "bin" / "agent-barrage-emit"
+EMITTER_PATH = Path(__file__).resolve().parents[1] / "bin" / "agent-marquee-emit"
 
 
 def command_for(agent):
@@ -34,7 +34,7 @@ def command_for(agent):
     source_checkout = EMITTER_PATH.parents[1] / "demo" / "run.sh"
     if EMITTER_PATH.is_file() and source_checkout.is_file():
         return f"/usr/bin/env python3 {shlex.quote(str(EMITTER_PATH))} --adapter {agent}"
-    return f"{shlex.quote(sys.executable)} -m agent_barrage.emit --adapter {agent}"
+    return f"{shlex.quote(sys.executable)} -m agent_marquee.emit --adapter {agent}"
 
 
 def is_our_handler(handler, agent):
@@ -48,13 +48,13 @@ def is_our_handler(handler, agent):
     except ValueError:
         return False
     if len(parts) == 3 and parts[1:] == ["--hook-adapter", agent]:
-        return Path(parts[0]).name == "AgentBarrage"
+        return Path(parts[0]).name in {"AgentMarquee", "AgentBarrage"}
     if len(parts) != 5:
         return False
     source_command = (parts[0] == "/usr/bin/env" and parts[1] == "python3"
-                      and Path(parts[2]).name == "agent-barrage-emit")
+                      and Path(parts[2]).name in {"agent-marquee-emit", "agent-barrage-emit"})
     installed_command = (bool(re.fullmatch(r"python(?:3(?:\.\d+)?)?", Path(parts[0]).name))
-                         and parts[1:3] == ["-m", "agent_barrage.emit"])
+                         and parts[1] == "-m" and parts[2] in {"agent_marquee.emit", "agent_barrage.emit"})
     return (source_command or installed_command) and parts[3:] == ["--adapter", agent]
 
 
@@ -100,12 +100,12 @@ def atomic_save(path, content):
         raise OSError(f"refusing to replace symlinked settings: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        backup = path.with_name(path.name + ".agentbarrage-backup")
+        backup = path.with_name(path.name + ".agentmarquee-backup")
         if not backup.exists():
             backup.write_bytes(path.read_bytes())
             os.chmod(backup, 0o600)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent,
-                                     prefix=".agentbarrage.", delete=False) as temp:
+                                     prefix=".agentmarquee.", delete=False) as temp:
         temp.write(content)
         temp_path = Path(temp.name)
     os.chmod(temp_path, 0o600)
@@ -120,7 +120,7 @@ def read_config(agent):
 
 
 def integration_status(agent):
-    """Count only AgentBarrage-owned handlers in one tool's config."""
+    """Count only AgentMarquee-owned handlers in one tool's config."""
     config = read_config(agent)
     hooks = config.get("hooks", {}) if isinstance(config, dict) else {}
     if not isinstance(hooks, dict):
@@ -151,7 +151,7 @@ def main(argv=None):
         update_config(read_config(args.agent), args.agent, args.uninstall)
         print(f"Config: {path}\nCommand: {command_for(args.agent)}")
         print(f"Events ({len(EVENTS[args.agent])}): {', '.join(EVENTS[args.agent])}")
-        print("Action: remove AgentBarrage handlers" if args.uninstall else "Action: add AgentBarrage handlers")
+        print("Action: remove AgentMarquee handlers" if args.uninstall else "Action: add AgentMarquee handlers")
         return 0
     apply_agent(args.agent, args.uninstall)
     print(f"{'Removed' if args.uninstall else 'Installed'} {args.agent} hooks: {path}")

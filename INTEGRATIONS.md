@@ -1,13 +1,13 @@
 # 接入任意 AI 工具或对话
 
-AgentBarrage 的来源是一个可显示的名称与小写标识（例如 `my-chat`）。**添加来源只建立身份，不会自动读取该工具的对话。** 事件必须由该工具的 Hook、自动化、脚本或用户主动发送。
+AgentMarquee 的来源是一个可显示的名称与小写标识（例如 `my-chat`）。**添加来源只建立身份，不会自动读取该工具的对话。** 事件必须由该工具的 Hook、自动化、脚本或用户主动发送。
 
 ## 选择接入方式
 
 | 来源具备的能力 | 建议接法 | 当前状态 |
 | --- | --- | --- |
 | Codex / Claude Code / CodeBuddy Code 的生命周期 Hook | 主窗口“智能体接入”一键安装 | 已实现，真实覆盖按产品逐项验收 |
-| 其他工具能运行命令或脚本 | 创建自定义来源，把生成的 `agent-barrage-send` 命令放进 Hook/任务完成动作 | 已实现 |
+| 其他工具能运行命令或脚本 | 创建自定义来源，把生成的 `agent-marquee-send` 命令放进 Hook/任务完成动作 | 已实现 |
 | 本机自动化或客户端能发 HTTP 请求 | 创建自定义来源，单独启动带密钥的本机 HTTP 接口 | 已实现，默认关闭 |
 | 工具没有事件接口 | 手动调用发送命令；若要自动化，需要该工具提供扩展或事件 API | 手动发送已实现 |
 | 浏览器里的 AI 对话 | 未来可由用户安装特定站点扩展，将选定事件交给本机 HTTP 接口 | 扩展尚未实现 |
@@ -30,7 +30,7 @@ AgentBarrage 的来源是一个可显示的名称与小写标识（例如 `my-ch
 通用命令示例：
 
 ```sh
-agent-barrage-send --agent my-chat --kind success --message "回答已完成" --detail "修复了登录错误" --project "对话"
+agent-marquee-send --agent my-chat --kind success --message "回答已完成" --detail "修复了登录错误" --project "对话"
 ```
 
 `kind` 可为 `working`、`success`、`attention`、`error`。`message` 最多显示 120 字，始终作为状态摘要显示；`detail` 可选，最多 48 字，仅当用户在弹幕设置里选择“部分详情”时显示。发送端应将会话短摘录放在 `detail`，由用户选择是否显示；发送端仍需自行避免把私密原文、凭证或敏感数据传进来。
@@ -40,10 +40,10 @@ agent-barrage-send --agent my-chat --kind success --message "回答已完成" --
 接口是可选的独立进程，默认不会启动：
 
 ```sh
-agent-barrage-bridge
+agent-marquee-bridge
 ```
 
-它仅绑定 `127.0.0.1:8765`，接收 `POST /v1/events`，要求 `Authorization: Bearer <本机密钥>` 和 `Content-Type: application/json`。首次启动会在 `~/Library/Application Support/AgentBarrage/bridge-token` 生成仅当前用户可读的密钥；需要查看时显式传入 `--show-token`。HTTP 接口只接受已登记的自定义来源，限制请求体大小和消息长度，不提供跨域许可头。
+它仅绑定 `127.0.0.1:8765`，接收 `POST /v1/events`，要求 `Authorization: Bearer <本机密钥>` 和 `Content-Type: application/json`。首次启动会在 `~/Library/Application Support/AgentMarquee/bridge-token` 生成仅当前用户可读的密钥；需要查看时显式传入 `--show-token`。HTTP 接口只接受已登记的自定义来源，限制请求体大小和消息长度，不提供跨域许可头。
 
 请求正文：
 
@@ -55,4 +55,4 @@ agent-barrage-bridge
 
 ## 添加新的内置适配器
 
-若要给某个工具提供一键安装，贡献者可以在 `agent_barrage/adapters/` 新增正规化模块，并在安装器中登记该工具的 Hook 配置。自定义来源和 Event v1 不需要随工具数量改变。
+若要给某个工具提供一键安装，贡献者可以在 `agent_marquee/adapters/` 新增正规化模块，并在安装器中登记该工具的 Hook 配置。自定义来源和 Event v1 不需要随工具数量改变。

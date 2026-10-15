@@ -2,7 +2,7 @@
 
 ## 目标
 
-一个独立的屏幕弹幕程序同时接收多个智能体事件。每个智能体只负责把自己的生命周期事件转换为统一格式；显示层不认识各家的原始 Hook 字段。新智能体可以新增适配器，或直接调用 `agent-barrage-send`，无需修改现有适配器。
+一个独立的屏幕弹幕程序同时接收多个智能体事件。每个智能体只负责把自己的生命周期事件转换为统一格式；显示层不认识各家的原始 Hook 字段。新智能体可以新增适配器，或直接调用 `agent-marquee-send`，无需修改现有适配器。
 
 ```text
 Codex Hook ──────> codex adapter ───┐
@@ -16,20 +16,20 @@ CodeBuddy Hook ──> codebuddy adapter ─┤
 
 | 模块 | 职责 | 依赖 |
 | --- | --- | --- |
-| `agent_barrage/core/events.py` | Event v1 字段、长度和来源校验 | Python 标准库 |
-| `agent_barrage/core/spool.py` | 本机事件投递、短期缓存与过期清理 | Python 标准库 |
-| `agent_barrage/core/history.py` | 最近 200 条弹幕的内存历史、隐私清理 | Python 标准库 |
-| `agent_barrage/core/traffic.py` | 重复事件合并、普通事件限流及批次优先级 | Python 标准库 |
-| `agent_barrage/adapters/` | 各智能体 Hook 输入到 Event v1 的转换；只允许安全摘要出站 | core |
-| `agent_barrage/emit.py` | Hook 统一入口，读取 stdin JSON，选择适配器 | adapters + core |
-| `agent_barrage/send.py` | 第三方工具显式发送 Event v1 | core |
-| `agent_barrage/install.py` | 对每个工具单独合并/卸载 Hook 配置 | Python 标准库 |
-| `agent_barrage/display/macos.py` | macOS 原生悬浮层、菜单栏入口、接入/历史/设置窗口 | AppKit + core |
-| `agent_barrage/display/icons.py` | 优先读取本机工具图标（Codex 专用图标），为缺失来源绘制字母标识 | AppKit |
-| `agent_barrage/display/sample_events.py` | 仅 `--demo` 使用的假数据 | Python 标准库 |
-| `agent_barrage/core/settings.py` | 用户目录设置与旧演示设置迁移 | Python 标准库 |
-| `agent_barrage/core/sources.py` | 自定义来源登记、显示名称与安全存储 | Python 标准库 |
-| `agent_barrage/bridge.py` | 可选的本机 HTTP 接口，密钥校验后复用 Event v1 | Python 标准库 |
+| `agent_marquee/core/events.py` | Event v1 字段、长度和来源校验 | Python 标准库 |
+| `agent_marquee/core/spool.py` | 本机事件投递、短期缓存与过期清理 | Python 标准库 |
+| `agent_marquee/core/history.py` | 最近 200 条弹幕的内存历史、隐私清理 | Python 标准库 |
+| `agent_marquee/core/traffic.py` | 重复事件合并、普通事件限流及批次优先级 | Python 标准库 |
+| `agent_marquee/adapters/` | 各智能体 Hook 输入到 Event v1 的转换；只允许安全摘要出站 | core |
+| `agent_marquee/emit.py` | Hook 统一入口，读取 stdin JSON，选择适配器 | adapters + core |
+| `agent_marquee/send.py` | 第三方工具显式发送 Event v1 | core |
+| `agent_marquee/install.py` | 对每个工具单独合并/卸载 Hook 配置 | Python 标准库 |
+| `agent_marquee/display/macos.py` | macOS 原生悬浮层、菜单栏入口、接入/历史/设置窗口 | AppKit + core |
+| `agent_marquee/display/icons.py` | 优先读取本机工具图标（Codex 专用图标），为缺失来源绘制字母标识 | AppKit |
+| `agent_marquee/display/sample_events.py` | 仅 `--demo` 使用的假数据 | Python 标准库 |
+| `agent_marquee/core/settings.py` | 用户目录设置与旧演示设置迁移 | Python 标准库 |
+| `agent_marquee/core/sources.py` | 自定义来源登记、显示名称与安全存储 | Python 标准库 |
+| `agent_marquee/bridge.py` | 可选的本机 HTTP 接口，密钥校验后复用 Event v1 | Python 标准库 |
 
 ## Event v1
 
@@ -39,7 +39,7 @@ CodeBuddy Hook ──> codebuddy adapter ─┤
 
 ## 本机传输
 
-生产者将单个 JSON 事件原子写入 `/tmp/agentbarrage-<uid>/`，目录权限为 `0700`。显示层轮询、校验并消费，超过 45 秒的事件丢弃。文件传输不要求智能体 Hook 拥有网络或 Unix socket 权限；弹幕程序短暂退出时事件可等待其重新启动。未来可加其他传输实现，但不能改变 Event v1 语义。
+生产者将单个 JSON 事件原子写入 `/tmp/agentbarrage-<uid>/`，目录权限为 `0700`。此内部路径保留旧名称，以兼容已运行的旧版 Hook 进程。显示层轮询、校验并消费，超过 45 秒的事件丢弃。文件传输不要求智能体 Hook 拥有网络或 Unix socket 权限；弹幕程序短暂退出时事件可等待其重新启动。未来可加其他传输实现，但不能改变 Event v1 语义。
 
 自定义来源登记在用户目录，独立于内置适配器。可选 HTTP 接口仅监听 loopback，使用 0600 密钥文件和 Bearer 校验；默认关闭，仅接受已登记来源。它是另一个输入边界，不让远程网页直接读取桌面内容或隐式发送事件。
 

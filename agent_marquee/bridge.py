@@ -12,12 +12,15 @@ from pathlib import Path
 from .core.events import KINDS, make_event, with_detail
 from .core.sources import SOURCES_PATH, SourceRegistry
 from .core.spool import publish
+from .core.migration import migrate_user_data
 
 TOKEN_PATH = SOURCES_PATH.with_name("bridge-token")
 MAX_BODY_BYTES = 4096
 
 
 def load_or_create_token(path=TOKEN_PATH):
+    if path == TOKEN_PATH:
+        migrate_user_data()
     if path.is_symlink():
         raise OSError("拒绝读取符号链接形式的接口密钥")
     if path.exists():
@@ -109,7 +112,7 @@ def main(argv=None):
     token = load_or_create_token()
     if args.show_token:
         print(f"Token: {token}")
-    print(f"AgentBarrage bridge listening on http://127.0.0.1:{args.port}/v1/events", flush=True)
+    print(f"AgentMarquee bridge listening on http://127.0.0.1:{args.port}/v1/events", flush=True)
     registry = SourceRegistry()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(token, registry))
     try:

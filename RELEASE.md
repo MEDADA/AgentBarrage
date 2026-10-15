@@ -9,7 +9,7 @@
 - [x] 可重复构建的 macOS `.app`、菜单栏专用图标、无 Dock 图标及打包版 Hook 后台入口；已在本机启动并用模拟事件验收。
 - [x] 去重、工作事件限流、重要事件优先显示、可选来源网页链接与历史跳转。
 - [x] 主屏幕/所有屏幕设置、显示器变化时重建，以及遵循系统“减少动态效果”。
-- [x] 在 [`MEDADA/AgentBarrage`](https://github.com/MEDADA/AgentBarrage) 建立公开 GitHub 仓库、推送源码并开启 Private Vulnerability Reporting。
+- [x] 在 [`MEDADA/AgentMarquee`](https://github.com/MEDADA/AgentMarquee) 建立公开 GitHub 仓库、推送源码并开启 Private Vulnerability Reporting。
 - [x] 仓库归属与名称已确定；当前源码使用 MIT 许可证。
 
 ## 后续产品验收（不阻止源码开源）

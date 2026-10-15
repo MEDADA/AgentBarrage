@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 
-OUTPUT = Path(__file__).with_name("AgentBarrage.icns")
+OUTPUT = Path(__file__).with_name("AgentMarquee.icns")
 
 
 def render(size):
@@ -25,8 +25,8 @@ def render(size):
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="agentbarrage-icon-") as temporary:
-        iconset = Path(temporary) / "AgentBarrage.iconset"
+    with tempfile.TemporaryDirectory(prefix="agentmarquee-icon-") as temporary:
+        iconset = Path(temporary) / "AgentMarquee.iconset"
         iconset.mkdir()
         for points in (16, 32, 128, 256, 512):
             render(points).save(iconset / f"icon_{points}x{points}.png")

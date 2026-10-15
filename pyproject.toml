@@ -3,13 +3,13 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentbarrage"
+name = "agentmarquee"
 version = "0.1.0"
 description = "Local desktop barrage notifications for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
-authors = [{name = "AgentBarrage contributors"}]
+authors = [{name = "AgentMarquee contributors"}]
 keywords = ["codex", "claude-code", "codebuddy", "notifications", "macos"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -25,11 +25,16 @@ classifiers = [
 macos = ["pyobjc-framework-Cocoa>=10,<13"]
 
 [project.scripts]
-agent-barrage = "agent_barrage.display.macos:main"
-agent-barrage-send = "agent_barrage.send:main"
-agent-barrage-hooks = "agent_barrage.install:main"
-agent-barrage-emit = "agent_barrage.emit:main"
-agent-barrage-bridge = "agent_barrage.bridge:main"
+agent-marquee = "agent_marquee.display.macos:main"
+agent-marquee-send = "agent_marquee.send:main"
+agent-marquee-hooks = "agent_marquee.install:main"
+agent-marquee-emit = "agent_marquee.emit:main"
+agent-marquee-bridge = "agent_marquee.bridge:main"
+agent-barrage = "agent_marquee.display.macos:main"
+agent-barrage-send = "agent_marquee.send:main"
+agent-barrage-hooks = "agent_marquee.install:main"
+agent-barrage-emit = "agent_marquee.emit:main"
+agent-barrage-bridge = "agent_marquee.bridge:main"
 
 [tool.setuptools.packages.find]
-include = ["agent_barrage*"]
+include = ["agent_marquee*", "agent_barrage*"]

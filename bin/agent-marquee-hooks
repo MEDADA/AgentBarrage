@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Install or uninstall one agent integration at a time."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from agent_marquee.install import main
+
+raise SystemExit(main())

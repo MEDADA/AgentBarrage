@@ -1,6 +1,6 @@
 """CodeBuddy Code command hook adapter; IDE coverage needs separate validation."""
 
-from agent_barrage.core.events import make_event, with_detail
+from agent_marquee.core.events import make_event, with_detail
 from .details import tool_detail
 
 

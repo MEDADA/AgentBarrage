@@ -9,8 +9,9 @@ import tempfile
 from pathlib import Path
 
 from .events import valid_agent
+from .migration import DATA_DIR, migrate_user_data
 
-SOURCES_PATH = Path.home() / "Library" / "Application Support" / "AgentBarrage" / "sources.json"
+SOURCES_PATH = DATA_DIR / "sources.json"
 BUILTIN_IDS = {"codex", "claude-code", "codebuddy"}
 MAX_SOURCES = 50
 ICON_SUFFIXES = {".png", ".jpg", ".jpeg", ".icns"}
@@ -27,6 +28,8 @@ def clean_name(name):
 
 
 def load_sources(path=SOURCES_PATH):
+    if path == SOURCES_PATH:
+        migrate_user_data()
     if path.is_symlink():
         raise OSError("拒绝读取符号链接形式的来源配置")
     if not path.exists():

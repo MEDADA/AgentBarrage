@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .events import valid_event
 
+# Keep the transport directory stable for already installed hook processes.
 SPOOL_DIR = Path(f"/tmp/agentbarrage-{os.getuid()}")
 MAX_EVENT_BYTES = 4096
 MAX_AGE_SECONDS = 45
@@ -20,7 +21,7 @@ def ensure_spool():
     SPOOL_DIR.mkdir(mode=0o700, exist_ok=True)
     info = SPOOL_DIR.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-        raise OSError("unsafe AgentBarrage spool directory")
+        raise OSError("unsafe AgentMarquee spool directory")
     os.chmod(SPOOL_DIR, 0o700)
 
 

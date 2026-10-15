@@ -10,18 +10,19 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agent_barrage.adapters.codex import normalize
-from agent_barrage.adapters.claude_code import normalize as normalize_claude
-from agent_barrage.adapters.codebuddy import normalize as normalize_codebuddy
-from agent_barrage.core.events import make_event, valid_event
-from agent_barrage.core.history import HistoryStore
-from agent_barrage.core.progress import ProgressGate
-from agent_barrage.core.settings import load_settings, save_settings
-from agent_barrage.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
-from agent_barrage.bridge import make_handler, load_or_create_token
-from agent_barrage.core import spool
-from agent_barrage.install import EVENTS, CONFIG_PATHS, command_for, is_our_handler, update_config, atomic_save, integration_status, apply_agent
-import agent_barrage.install as install_module
+from agent_marquee.adapters.codex import normalize
+from agent_marquee.adapters.claude_code import normalize as normalize_claude
+from agent_marquee.adapters.codebuddy import normalize as normalize_codebuddy
+from agent_marquee.core.events import make_event, valid_event
+from agent_marquee.core.history import HistoryStore
+from agent_marquee.core.progress import ProgressGate
+from agent_marquee.core.settings import load_settings, save_settings
+from agent_marquee.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
+from agent_marquee.bridge import make_handler, load_or_create_token
+from agent_marquee.core import spool
+from agent_marquee.core import migration
+from agent_marquee.install import EVENTS, CONFIG_PATHS, command_for, is_our_handler, update_config, atomic_save, integration_status, apply_agent
+import agent_marquee.install as install_module
 
 
 class HookBridgeTest(unittest.TestCase):
@@ -127,19 +128,22 @@ class HookBridgeTest(unittest.TestCase):
 
     def test_uninstall_matches_only_our_exact_command(self):
         self.assertTrue(is_our_handler({"command": command_for("codex")}, "codex"))
-        self.assertFalse(is_our_handler({"command": "echo agent-barrage-emit --adapter codex"}, "codex"))
+        self.assertFalse(is_our_handler({"command": "echo agent-marquee-emit --adapter codex"}, "codex"))
         self.assertFalse(is_our_handler({"command": command_for("claude-code")}, "codex"))
         self.assertFalse(is_our_handler({"command": "unterminated ' quote"}, "codex"))
-        with patch.object(install_module, "EMITTER_PATH", Path("/definitely/missing/agent-barrage-emit")):
+        self.assertTrue(is_our_handler({"command": "/usr/bin/env python3 /old/bin/agent-barrage-emit --adapter codex"}, "codex"))
+        self.assertTrue(is_our_handler({"command": "/usr/bin/python3 -m agent_barrage.emit --adapter codex"}, "codex"))
+        self.assertTrue(is_our_handler({"command": "/Applications/AgentBarrage.app/Contents/MacOS/AgentBarrage --hook-adapter codex"}, "codex"))
+        with patch.object(install_module, "EMITTER_PATH", Path("/definitely/missing/agent-marquee-emit")):
             packaged = command_for("codex")
-            self.assertIn("-m agent_barrage.emit", packaged)
+            self.assertIn("-m agent_marquee.emit", packaged)
             self.assertTrue(is_our_handler({"command": packaged}, "codex"))
         with tempfile.TemporaryDirectory() as directory:
-            fake_script = Path(directory) / "bin" / "agent-barrage-emit"
+            fake_script = Path(directory) / "bin" / "agent-marquee-emit"
             fake_script.parent.mkdir()
             fake_script.write_text("", encoding="utf-8")
             with patch.object(install_module, "EMITTER_PATH", fake_script):
-                self.assertIn("-m agent_barrage.emit", command_for("codex"))
+                self.assertIn("-m agent_marquee.emit", command_for("codex"))
 
     def test_installer_rejects_symlinked_settings(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -293,6 +297,26 @@ class HookBridgeTest(unittest.TestCase):
             token = load_or_create_token(path)
             self.assertEqual(token, load_or_create_token(path))
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+
+    def test_rename_migrates_data_without_overwriting_new_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            old = Path(directory) / "AgentBarrage"
+            new = Path(directory) / "AgentMarquee"
+            (old / "icons").mkdir(parents=True)
+            (old / "settings.json").write_text('{"style":"纯文字"}', encoding="utf-8")
+            (old / "sources.json").write_text('{"version":1,"sources":[]}', encoding="utf-8")
+            (old / "bridge-token").write_text("old-secret", encoding="ascii")
+            (old / "icons" / "custom.png").write_bytes(b"image")
+            new.mkdir()
+            (new / "settings.json").write_text("newer", encoding="utf-8")
+            with patch.object(migration, "LEGACY_DATA_DIR", old), patch.object(migration, "DATA_DIR", new):
+                migration.migrate_user_data()
+                migration.migrate_user_data()
+            self.assertEqual((new / "settings.json").read_text(), "newer")
+            self.assertEqual((new / "sources.json").read_text(), '{"version":1,"sources":[]}')
+            self.assertEqual((new / "bridge-token").read_text(), "old-secret")
+            self.assertEqual((new / "icons" / "custom.png").read_bytes(), b"image")
 
 
 if __name__ == "__main__":

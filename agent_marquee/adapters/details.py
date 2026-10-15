@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from agent_barrage.core.events import short_text
+from agent_marquee.core.events import short_text
 
 SAFE_PROGRAMS = {"python", "python3", "git", "npm", "pnpm", "yarn", "pytest", "rg", "swift", "xcodebuild", "make"}
 FILE_TOOLS = {"Write", "Edit", "Read", "write_to_file", "replace_in_file", "read_file"}
