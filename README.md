@@ -1,14 +1,26 @@
 # AgentBarrage
 
-![AgentBarrage 弹幕气泡标志](assets/agentbarrage-logo.svg)
+<img src="assets/agentbarrage-logo.svg" alt="AgentBarrage 标志" width="64">
 
-AgentBarrage 将 Codex、Claude Code、CodeBuddy Code 等本机智能体的工作状态显示为 macOS 桌面弹幕。不同工具通过独立适配器接入同一事件协议；内置适配器只发送预设短句和经过筛选的详情。
+[![Tests](https://github.com/MEDADA/AgentBarrage/actions/workflows/test.yml/badge.svg)](https://github.com/MEDADA/AgentBarrage/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**当前状态：源码已在 [GitHub](https://github.com/MEDADA/AgentBarrage) 开源，可从源码运行；暂无 `.app` 安装包发布计划。** 原生悬浮窗、接入管理、样式设置、内存历史、三个 Hook 适配器和本机发送命令已经实现。Codex Hook 已在本机实际触发并显示。Claude Code 与 CodeBuddy Code 的适配器通过模拟 Hook 输入验证，真实产品覆盖仍需验收。CodeBuddy 桌面版/IDE 的实际接入方式仍需验证。
+把 Codex 等 AI 工具的工作事件显示为 **macOS 桌面弹幕**。当多个任务同时运行时，你可以在当前窗口上看到进度、完成、需处理和失败提示。程序常驻菜单栏，弹幕点击穿透，不占用程序坞。
 
-## 在 macOS 启动
+![使用原生 AppKit 渲染的纯文字弹幕示意图](assets/barrage-preview.png)
 
-需要 macOS、Python 3.11 或更新版本。克隆仓库后运行：
+> **项目状态：早期版本。** 目前公开源码，尚未提供签名、公证的 `.app` 下载。macOS 显示层已可运行；Codex Hook 已在本机实际触发，Claude Code 与 CodeBuddy Code 适配器已用模拟输入验证，真实版本与产品形态仍在验收。详见[兼容性与限制](#兼容性与限制)。
+
+## 功能
+
+- **多来源事件：** Codex、Claude Code、CodeBuddy Code 使用独立 Hook 适配器；其他工具可通过命令或可选的本机 HTTP 接口发送。
+- **原生弹幕：** 滚动或固定停留、区域和密度控制、重要事件优先显示，并可暂停或过滤。
+- **外观设置：** 胶囊、轻盈和纯文字样式；字体、字号、文字颜色、外描边、透明度与间距均可调整。纯文字样式不显示状态灯、背景或来源图标。
+- **隐私与历史：** 默认显示短状态；可选择展示经过筛选的部分详情。最近 200 条已显示事件只保存在内存中。
+
+## 快速开始
+
+需要 **macOS、Python 3.11+ 和 Git**。在终端运行：
 
 ```sh
 git clone https://github.com/MEDADA/AgentBarrage.git
@@ -18,92 +30,74 @@ python3 -m venv .venv
 ./.venv/bin/agent-barrage
 ```
 
-本机若已安装 PyObjC，也可直接运行 `python3 bin/agent-barrage`。这是正式入口，默认只显示真实接入事件，没有模拟按钮。启动后右上角出现控制窗和菜单栏弹幕气泡图标，透明弹幕显示在当前系统窗口之上；程序不占用程序坞。关闭控制窗后可从菜单栏重新打开，选择“退出 AgentBarrage”才会退出程序。使用包安装后，可直接调用虚拟环境中的 `agent-barrage`、`agent-barrage-hooks`、`agent-barrage-send` 和可选的 `agent-barrage-bridge`。
+启动后，菜单栏会出现 AgentBarrage 图标。首次运行只等待真实事件，不会自动播放假数据。想先看动效，可将最后一条命令改为 `./.venv/bin/agent-barrage --demo`。
 
-开发者如需在本机生成独立 `.app`（需要 Xcode Command Line Tools）：
+保持程序运行，在另一个终端发送测试弹幕：
 
 ```sh
-./.venv/bin/python -m pip install pyinstaller pillow
-PATH="$PWD/.venv/bin:$PATH" sh packaging/macos/build.sh
-open dist/AgentBarrage.app
+./.venv/bin/agent-barrage-send --agent my-agent --kind success --message "测试完成" --project Demo
 ```
 
-构建结果在 `dist/AgentBarrage.app`，它可直接运行且不依赖源码 Python 环境，但目前只有临时签名、没有公证，仅供本机试用。双击后从“智能体接入”安装 Hooks；打包版的 Hook 和自定义来源命令都通过应用内置的后台入口发送。移动 `.app` 后请重新安装 Hooks，以更新绝对路径。
+`kind` 可选 `working`、`success`、`attention`、`error`。控制窗的“弹幕设置”可调整字体和颜色；关闭控制窗后，可从菜单栏重新打开。选择菜单栏中的“退出 AgentBarrage”才会结束程序。
 
-要单独查看假数据动效，请运行 `./demo/run.sh`、`python3 bin/agent-barrage --demo` 或 `./.venv/bin/agent-barrage --demo`。只有演示模式才出现“工作 / 需批准 / 完成 / 错误”和循环播放按钮。
+## 接入 AI 工具
 
-“弹幕设置”可调整样式、字体、文字颜色、文字描边、区域、字号、滚动速度、透明度和行间距。默认使用 macOS 自带的苹方；也可选择系统字体、冬青、宋体或华文黑体。缺少所选字体时会回退到系统字体。参考 [B 站的弹幕控制项](https://www.bilibili.com/video/BV1Wp4y1P7KU/)，还加入了适合桌面通知的设置：
+### Codex、Claude Code、CodeBuddy Code
 
-- **文字颜色：macOS 原生颜色卡。** 点击色块可自由选色；在白色页面上使用纯文字样式时，可选择深色文字。程序不读取屏幕背景，也不需要屏幕录制权限。
-- **文字外描边：默认关闭。** 可独立设置描边颜色和 0.5–1.5 px 粗细，修改后即时预览；轮廓画在字形外侧，避免压细文字笔画。
-- **弹幕文字层级。** 来源名用较小的状态色文字，项目名用浅色小字，事件内容为主文字；不再绘制状态灯。选择“纯文字”时不显示背景与来源图标。
+打开 **智能体接入**，选择对应工具的“安装 / 更新”。程序会分别修改该工具的用户级 Hook 配置，并保留其他配置；首次修改已有配置时会生成备份。Codex 和 CodeBuddy Code 还需要在各自的 `/hooks` 中完成信任审查。正在运行的会话可能需要重启。
 
-- **内容：简洁摘要 / 部分详情。** 默认只显示预设工作状态；选择“部分详情”后，可附上经过适配器筛选的程序名或文件名。不会展示原始提问、命令参数、文件内容或工具输出。若某工具没有可安全提取的详情，仍只显示摘要。
-- **进度弹幕：精简 / 全部。** 默认合并同一会话 3 秒内的普通工具开始事件，并省略普通工具结束提示；失败、需处理与完成事件仍显示。“全部”展示每条 Hook 事件。
-- **播放方式：滚动 / 固定停留。** 固定弹幕按设定时长停留；区域决定显示在顶部、中部或底部。
-- **区域占比与同屏密度。** 控制可使用的屏幕高度，以及最多同时显示多少条。密度满时优先移走普通工作提示，保留需处理和错误提示。
-- **类型过滤。** 可隐藏普通工作提示，或只看需处理与错误事件。
-- **来源图标。** 胶囊和轻盈样式可选显示图标；Codex 优先读取本机已安装程序的专用 Codex 图标，其他内置来源读取应用图标；找不到时使用来源字母标识。纯文字样式始终不显示图标。
-- **显示器与动态效果。** 可只在主屏幕显示；连接或断开显示器时悬浮层会重建。打开“减少动画”或启用 macOS 的减少动态效果后，滚动弹幕会改为固定停留。
-
-短时间内重复的事件会合并；普通工作事件有速率上限。需处理和错误事件在同批事件中优先显示。
-
-设置保存于 `~/Library/Application Support/AgentBarrage/settings.json`；首次运行会从旧的 `demo/settings.json` 迁移已有偏好。“历史记录”显示最近 200 条已展示事件，可清空；记录只在内存中，退出程序或开启隐私模式后会消失。隐私模式会隐藏屏幕上的来源与消息，并清空旧历史。
-
-卸载时，先在“智能体接入”分别卸载已启用的 Hooks，退出应用，再移走 `.app`。如果不再需要偏好、自定义来源和图标，可自行删除 `~/Library/Application Support/AgentBarrage/`；默认保留这些用户数据，便于重新安装。
-
-检查环境和运行测试：
+安装前想查看将修改的配置和事件，可用命令行预览：
 
 ```sh
-./.venv/bin/python -c 'import AppKit; print("PyObjC OK")'
+./.venv/bin/agent-barrage-hooks --agent codex --dry-run
+```
+
+### 其他 AI 工具或对话
+
+在 **智能体接入 → 添加或管理其他来源** 登记名称与标识，复制程序生成的发送命令，再放入该工具的 Hook、脚本或自动化动作。也可直接调用 `agent-barrage-send`。添加来源本身不会读取该工具的对话；自动发送需要来源工具提供事件接口。
+
+接入方式、可选的本机 HTTP 接口、链接跳转和事件字段见[任意来源接入指南](INTEGRATIONS.md)。
+
+## 没有看到弹幕？
+
+1. 确认 AgentBarrage 仍在运行，且没有在菜单栏中暂停弹幕。
+2. 先发送[快速开始](#快速开始)中的测试事件，确认显示层和本机投递正常。
+3. 若测试事件可见，检查对应工具的 Hook 是否安装、完成信任审查，并重启已有会话；同时检查“类型过滤”和“进度弹幕”设置。
+
+## 兼容性与限制
+
+| 来源 | 当前状态 |
+| --- | --- |
+| Codex Hook | 本机真实触发并显示；其他版本仍需持续验证 |
+| Claude Code Hook | 适配器和安装器已实现，模拟 Hook 输入通过；真实环境待验收 |
+| CodeBuddy Code Hook | 适配器和安装器已实现，模拟 Hook 输入通过；桌面版与 IDE 接口待确认 |
+| 其他本机工具 | 支持显式发送命令；能否自动发送取决于工具的 Hook 或自动化能力 |
+| 浏览器 AI 对话 | 尚无通用浏览器扩展；不能自动读取任意网页对话 |
+
+显示层目前仅支持 macOS。屏幕共享、全屏、多显示器和无障碍体验仍需进一步实机验收；进度见[产品计划](PLAN.md)和[发布检查清单](RELEASE.md)。
+
+## 隐私与卸载
+
+内置适配器只发送预设短句和经过筛选的短详情，不发送原始提问、完整命令、工具输出或凭证。弹幕历史只在内存中，退出后消失；开启隐私模式会隐藏屏幕上的来源和内容，并清空旧历史。程序不读取屏幕、剪贴板或浏览器页面。本机 HTTP 接口默认关闭，开启后需要独立密钥。自定义来源的发送者应自行检查消息内容。
+
+卸载 Hook 前，请先在“智能体接入”中逐个选择“卸载”，或运行：
+
+```sh
+./.venv/bin/agent-barrage-hooks --agent codex --uninstall
+./.venv/bin/agent-barrage-hooks --agent claude-code --uninstall
+./.venv/bin/agent-barrage-hooks --agent codebuddy --uninstall
+```
+
+之后退出程序并移除仓库即可。Hook 命令包含仓库的绝对路径，因此**移动或删除仓库前应先卸载 Hook**。设置和自定义来源默认保留在 `~/Library/Application Support/AgentBarrage/`，可按需手动删除。
+
+## 开发与贡献
+
+核心事件协议与各工具适配器不依赖 AppKit；macOS 显示层位于 `agent_barrage/display/macos.py`。运行测试：
+
+```sh
 python3 -m unittest discover -s tests -v
 ```
 
-## 发送一条测试弹幕
+新增适配器、报告问题或提交代码前，请阅读[架构说明](ARCHITECTURE.md)、[贡献指南](CONTRIBUTING.md)和[安全问题反馈](SECURITY.md)。漏洞请通过仓库的私密报告渠道提交，不要放在公开 Issue。
 
-保持桌面程序运行，在另一个终端执行：
-
-```sh
-python3 bin/agent-barrage-send --agent my-agent --kind success --message "测试完成" --project Demo
-```
-
-`--agent` 使用小写字母、数字和连字符；`--kind` 可选 `working`、`success`、`attention`、`error`。任何本机工具均可调用此命令，但发送者应确保 `--message` 适合显示在屏幕上。来源有网页任务地址时，可加 `--url 'https://example.com/task/123'`；历史记录会显示“打开来源”。链接仅在用户点击后打开，不会自动访问。内置 Hook 当前没有可靠的来源任务链接，因此不会猜测地址。
-
-## 接入智能体 Hooks
-
-主控制窗的“智能体接入”会显示 Codex、Claude Code、CodeBuddy Code 各自的 Hook 配置状态，并提供单独安装/更新与卸载按钮。安装只修改对应工具的用户级配置，不会自动授权 Hook；Codex 和 CodeBuddy Code 仍需在各自的 `/hooks` 审查。其他智能体可通过前述 `agent-barrage-send` 命令接入。
-
-对任意 AI 工具或对话，可在“智能体接入 → 添加或管理其他来源”登记名称和标识，复制自动生成的命令，并发送测试弹幕。支持 Hook 命令、本机自动化，以及默认关闭的带密钥本机 HTTP 接口。接入方式和网页对话的边界见[任意来源接入指南](./INTEGRATIONS.md)。
-
-也可以在终端管理。先预览将修改的配置路径和事件，再执行安装：
-
-```sh
-python3 bin/agent-barrage-hooks --agent codex --dry-run
-python3 bin/agent-barrage-hooks --agent codex
-python3 bin/agent-barrage-hooks --agent claude-code
-python3 bin/agent-barrage-hooks --agent codebuddy
-```
-
-安装器合并用户级 JSON 配置，保留其他设置与 Hook。已有配置第一次修改时会生成同目录的 `.agentbarrage-backup` 备份。Hook 命令引用当前仓库的绝对路径，因此**移动或删除仓库前先卸载 Hooks**；移动后如需继续使用，请从新路径重新安装。Codex 和 CodeBuddy Code 的非托管 Hooks 还需在各自的 `/hooks` 中完成信任审查，已运行的会话可能需要重启才加载新配置。
-
-单独卸载某个工具：
-
-```sh
-python3 bin/agent-barrage-hooks --agent codex --uninstall
-python3 bin/agent-barrage-hooks --agent claude-code --uninstall
-python3 bin/agent-barrage-hooks --agent codebuddy --uninstall
-```
-
-关闭桌面程序不会自动删除 Hook 配置。安装器拒绝覆盖符号链接形式的设置文件；遇到这种配置，请先人工确认目标文件和安装方式。
-
-## 开发与开源状态
-
-- [架构与隐私边界](./ARCHITECTURE.md)
-- [任意来源接入指南](./INTEGRATIONS.md)
-- [产品计划](./PLAN.md)
-- [贡献指南](./CONTRIBUTING.md)
-- [安全问题反馈](./SECURITY.md)
-- [发布检查清单](./RELEASE.md)
-- [MIT 许可证](./LICENSE)
-
-核心和适配器只依赖 Python 标准库；显示层位于 `agent_barrage/display/macos.py`，依赖 macOS AppKit/PyObjC。GitHub 源码开源的检查项和后续产品验收见 [发布检查清单](./RELEASE.md)。
+本项目采用 [MIT 许可证](LICENSE)。
