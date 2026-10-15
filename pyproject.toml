@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-macos = ["pyobjc-framework-Cocoa>=10,<13"]
+macos = ["pyobjc-framework-Cocoa>=10,<13", "pyobjc-framework-ApplicationServices>=10,<13"]
 
 [project.scripts]
 agent-marquee = "agent_marquee.display.macos:main"

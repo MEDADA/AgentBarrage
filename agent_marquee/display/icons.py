@@ -12,11 +12,13 @@ APP_BUNDLES = {
     "codex": ("com.openai.codex",),
     "claude-code": ("com.anthropic.claudefordesktop", "com.anthropic.claude"),
     "codebuddy": ("com.tencent.codebuddycn",),
+    "wechat": ("com.tencent.xinWeChat", "com.tencent.WeChat"),
 }
 FALLBACK_COLORS = {
     "codex": (0.22, 0.25, 0.30),
     "claude-code": (0.79, 0.47, 0.34),
     "codebuddy": (0.24, 0.53, 0.94),
+    "wechat": (0.13, 0.75, 0.42),
 }
 
 

@@ -12,7 +12,7 @@ from .events import valid_agent
 from .migration import DATA_DIR, migrate_user_data
 
 SOURCES_PATH = DATA_DIR / "sources.json"
-BUILTIN_IDS = {"codex", "claude-code", "codebuddy"}
+BUILTIN_IDS = {"codex", "claude-code", "codebuddy", "wechat"}
 MAX_SOURCES = 50
 ICON_SUFFIXES = {".png", ".jpg", ".jpeg", ".icns"}
 MAX_ICON_BYTES = 2 * 1024 * 1024

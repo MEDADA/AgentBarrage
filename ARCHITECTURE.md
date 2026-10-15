@@ -10,6 +10,7 @@ Claude Code Hook -> claude adapter ──┼─> Event v1 -> local spool -> over
 CodeBuddy Hook ──> codebuddy adapter ─┤
 任意本机工具 ────> send CLI ─────────┘
 本机自动化 ──────> token HTTP bridge ─┘
+微信可见通知 ────> optional AX adapter ─┘
 ```
 
 ## 模块职责
@@ -30,12 +31,15 @@ CodeBuddy Hook ──> codebuddy adapter ─┤
 | `agent_marquee/core/settings.py` | 用户目录设置与旧演示设置迁移 | Python 标准库 |
 | `agent_marquee/core/sources.py` | 自定义来源登记、显示名称与安全存储 | Python 标准库 |
 | `agent_marquee/bridge.py` | 可选的本机 HTTP 接口，密钥校验后复用 Event v1 | Python 标准库 |
+| `agent_marquee/notifications/` | 可选的 macOS 通知读取、微信识别和短期去重；默认关闭 | ApplicationServices + core |
 
 ## Event v1
 
 `version`, `agent`, `event`, `kind`, `message`, `project`, `session_id`, `turn_id`, `occurred_at`，以及可选的 `detail` 和 `open_url`。`kind` 为 `working`、`success`、`attention` 或 `error`。`agent` 是小写短标识。`detail` 由适配器从许可字段提取，最长 48 字；仅在用户选择“部分详情”时显示。`open_url` 仅接受不含账号密码的 HTTP(S) 地址，用户从历史记录主动打开。显示层可用 `agent + project` 区分并行任务。
 
 协议默认只发送事件类别、短句和项目名。不得将原始提问、思考、命令全文、工具输入/输出、完整路径或凭证塞进事件。`detail` 当前只允许少量程序名和文件 basename；`project` 是工作目录最后一级名称。启用隐私模式后显示层会进一步隐藏来源和内容。显示层的 `ProgressGate` 默认压缩普通工具事件，重要事件不压缩。
+
+微信通知接入器是单独的用户授权来源：默认只发送“有新消息”，显式开启预览后才把当前通知中的发送人和短文本放进 `message`。它只扫描 Notification Center 当前可见窗口的辅助功能树，不读取微信数据库、聊天窗口或系统通知数据库。读取到的原始文本不持久化；选中预览后生成的事件会短暂经过本机 spool，并遵循相同的历史与隐私处理。
 
 ## 本机传输
 
