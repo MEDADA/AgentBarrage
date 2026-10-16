@@ -71,11 +71,14 @@ def drain(limit=30):
     events = []
     for path in paths:
         try:
-            if path.stat().st_size > MAX_EVENT_BYTES:
+            info = path.stat()
+            now = time.time()
+            if (info.st_size > MAX_EVENT_BYTES
+                    or abs(now - info.st_mtime) > MAX_AGE_SECONDS):
                 continue
             event = json.loads(path.read_text(encoding="utf-8"))
             if ((valid_event(event) or valid_event_v2(event))
-                    and time.time() - event.get("occurred_at", 0) <= MAX_AGE_SECONDS):
+                    and abs(now - event.get("occurred_at", 0)) <= MAX_AGE_SECONDS):
                 events.append(event)
         except (OSError, ValueError, TypeError):
             pass
