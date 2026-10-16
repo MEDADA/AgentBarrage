@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from .events import valid_event
+from .event_v2 import valid_event_v2
 
 # Keep the transport directory stable for already installed hook processes.
 SPOOL_DIR = Path(f"/tmp/agentbarrage-{os.getuid()}")
@@ -26,7 +27,7 @@ def ensure_spool():
 
 
 def publish(event):
-    if not valid_event(event):
+    if not (valid_event(event) or valid_event_v2(event)):
         return False
     data = json.dumps(event, ensure_ascii=False).encode("utf-8")
     if len(data) > MAX_EVENT_BYTES:
@@ -73,7 +74,8 @@ def drain(limit=30):
             if path.stat().st_size > MAX_EVENT_BYTES:
                 continue
             event = json.loads(path.read_text(encoding="utf-8"))
-            if valid_event(event) and time.time() - event.get("occurred_at", 0) <= MAX_AGE_SECONDS:
+            if ((valid_event(event) or valid_event_v2(event))
+                    and time.time() - event.get("occurred_at", 0) <= MAX_AGE_SECONDS):
                 events.append(event)
         except (OSError, ValueError, TypeError):
             pass

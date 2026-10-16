@@ -10,6 +10,7 @@ import objc
 from AppKit import *
 from Foundation import NSObject, NSString, NSTimer, NSURL
 from agent_marquee.core.spool import drain, ensure_spool
+from agent_marquee.core.event_v2 import as_display_event
 from agent_marquee.core.history import HistoryStore
 from agent_marquee.core.progress import ProgressGate
 from agent_marquee.core.traffic import TrafficGate, prioritize
@@ -881,7 +882,8 @@ class Controller(NSObject):
         events = prioritize(drain(50))
         if events:
             self.sources.refresh()
-        for event in events:
+        for raw_event in events:
+            event = as_display_event(raw_event)
             if not self.sources.is_enabled(event["agent"]):
                 continue
             self.live_count += 1
