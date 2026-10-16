@@ -12,7 +12,8 @@ from .events import KINDS, short_text, valid_agent, valid_event, valid_open_url
 VERSION = 2
 EVENT_TYPES = {
     "session_started", "session_ended", "prompt_submitted", "tool_started",
-    "tool_finished", "tool_failed", "approval_requested", "input_requested",
+    "tool_finished", "tool_failed", "approval_requested", "approval_visible",
+    "input_requested", "task_completed", "task_failed", "task_cancelled",
     "turn_stop_observed", "turn_interrupted", "turn_failed",
     "subagent_started", "subagent_finished", "notification", "custom",
 }

@@ -1,6 +1,6 @@
 # AgentMarquee 项目计划
 
-更新：2026-10-14
+更新：2026-10-16。v0.2 的实施契约与进度以 [Notion 开发计划](https://app.notion.com/p/3fbe8af0638a8181a446debab4c57037) 为准；本文保留产品起点与首版历程。
 
 ## 1. 产品目标
 
@@ -29,7 +29,7 @@
 | 工具结束或失败 | “命令完成 / 工具失败” | 中，失败高 | `PostToolUse` Hook；具体成功判断需逐工具适配 |
 | 请求授权 | “Codex 需要批准” | 最高，持续到超时或状态更新 | `PermissionRequest` Hook；它表示即将询问，未必能独立得知后续决定 |
 | 子智能体开始或结束 | “子任务启动 / 完成” | 中 | `SubagentStart` / `SubagentStop` Hook |
-| 轮次完成 | “Codex 已完成” | 高 | `Stop` Hook；不能单凭此事件断定用户已读 |
+| 轮次收尾信号 | “本轮回应进入收尾，请查看任务” | 中 | `Stop` Hook；不能单凭此事件断定整项任务完成 |
 | 用户中断 | “任务已中断” | 中 | `Interrupt` Hook |
 | 会话结束 | “会话已结束” | 低 | `SessionEnd` Hook；它不是用户切换任务时的即时信号 |
 

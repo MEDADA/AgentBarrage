@@ -75,6 +75,13 @@ class HookBridgeTest(unittest.TestCase):
         self.assertTrue(valid_event(normalize_claude(payload)))
         self.assertTrue(valid_event(normalize_codebuddy(payload)))
 
+    def test_stop_and_permission_messages_do_not_claim_confirmed_outcomes(self):
+        for adapter in (normalize, normalize_claude, normalize_codebuddy):
+            stopped = adapter({"hook_event_name": "Stop", "session_id": "s1"})
+            self.assertNotIn("任务已完成", stopped["message"])
+            approval = adapter({"hook_event_name": "PermissionRequest", "session_id": "s1"})
+            self.assertNotIn("需要批准操作", approval["message"])
+
     def test_custom_agent_uses_same_protocol(self):
         event = make_event("my-agent", "custom", "success", "Done", "Sample")
         self.assertTrue(valid_event(event))
