@@ -9,7 +9,8 @@ PRIORITY = {"attention": 0, "error": 0, "success": 1, "working": 2}
 
 def prioritize(events):
     """Keep arrival order within each priority while surfacing requests first."""
-    return sorted(events, key=lambda event: PRIORITY.get(event.get("kind"), 2))
+    return sorted(events, key=lambda event: PRIORITY.get(
+        event.get("kind", event.get("presentation_kind")), 2))
 
 
 class TrafficGate:

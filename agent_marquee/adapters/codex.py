@@ -34,13 +34,13 @@ def normalize(payload):
         else:
             message = f"{label}已结束"
     elif event == "PermissionRequest":
-        message, kind = "需要批准操作", "attention"
+        message, kind = "可能需要批准，请查看任务", "attention"
     elif event == "SubagentStart":
         message = "子任务已开始"
     elif event == "SubagentStop":
         message, kind = "子任务已结束", "success"
     elif event == "Stop":
-        message, kind = "任务已完成，可以查看结果", "success"
+        message, kind = "本轮回应进入收尾，请查看任务", "success"
     elif event == "Interrupt":
         message, kind = "任务已中断", "attention"
     elif event == "SessionEnd":

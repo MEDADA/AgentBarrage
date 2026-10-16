@@ -4,15 +4,19 @@ import argparse
 import random
 import shlex
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 import objc
 from AppKit import *
 from Foundation import NSObject, NSString, NSTimer, NSURL
 from agent_marquee.core.spool import drain, ensure_spool
+from agent_marquee.core.attention import format_attention_rows
+from agent_marquee.core.ingestion import IngestionEngine
+from agent_marquee.core.barrage import BarragePlanner
 from agent_marquee.core.history import HistoryStore
 from agent_marquee.core.progress import ProgressGate
-from agent_marquee.core.traffic import TrafficGate, prioritize
+from agent_marquee.core.traffic import TrafficGate
 from agent_marquee.core.settings import DEFAULT_SETTINGS, load_settings, save_settings
 from agent_marquee.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
 from agent_marquee.core.events import make_event
@@ -257,12 +261,15 @@ class Controller(NSObject):
         self.progress_gate = ProgressGate()
         self.traffic_gate = TrafficGate()
         self.history = HistoryStore()
+        self.ingestion = IngestionEngine(started_at=time.time())
+        self.barrage = BarragePlanner(self.ingestion, self.traffic_gate, self.progress_gate)
         self.settings = load_settings()
         self.sources = SourceRegistry()
         self.icons = IconResolver()
         self.screen_signature = None
         self.settings_window = None
         self.history_window = None
+        self.tasks_window = None
         self.integration_window = None
         self.custom_window = None
         self.notification_window = None
@@ -328,6 +335,7 @@ class Controller(NSObject):
                 canvas.reduce_motion = reduce_motion
         if self.notification_window is not None and self.notification_window.isVisible():
             self.refresh_notification_status()
+        self.refresh_tasks()
 
     @objc.python_method
     def label(self, content, value, size, y, bold=False, x=20, width=310):
@@ -385,7 +393,8 @@ class Controller(NSObject):
             self.pause_button = self.button(content, "暂停", 98, "togglePause:", 20, 150)
             self.privacy_button = self.button(content, "隐私模式", 98, "togglePrivacy:", 180, 150)
         self.status.setTextColor_(NSColor.systemBlueColor())
-        self.button(content, "智能体接入", 55, "openIntegrations:", 20, 310)
+        self.button(content, "智能体接入", 55, "openIntegrations:", 20, 150)
+        self.button(content, "当前任务", 55, "openTasks:", 180, 150)
         self.button(content, "历史记录", 13, "openHistory:", 20, 150)
         self.button(content, "弹幕设置  ⚙", 13, "openSettings:", 180, 150)
         self.control.makeKeyAndOrderFront_(None)
@@ -398,12 +407,16 @@ class Controller(NSObject):
         menu = NSMenu.alloc().initWithTitle_("AgentMarquee")
         for title, action in (("显示控制窗", "openControl:"),
                               ("弹幕设置", "openSettings:"),
+                              ("当前任务", "openTasks:"),
                               ("历史记录", "openHistory:"),
                               ("智能体接入", "openIntegrations:"),
                               ("微信通知", "openNotifications:")):
-            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, "")
+            shortcut = "t" if action == "openTasks:" else ""
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, shortcut)
             item.setTarget_(self)
             menu.addItem_(item)
+            if action == "openTasks:":
+                self.menu_tasks_item = item
         menu.addItem_(NSMenuItem.separatorItem())
         self.menu_pause_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("暂停弹幕", "togglePause:", "")
         self.menu_pause_item.setTarget_(self)
@@ -416,6 +429,51 @@ class Controller(NSObject):
         quit_item.setTarget_(self)
         menu.addItem_(quit_item)
         self.status_item.setMenu_(menu)
+        self.refresh_tasks()
+
+    @objc.python_method
+    def build_tasks(self):
+        main = self.control.frame()
+        frame = NSMakeRect(main.origin.x - 460, main.origin.y + main.size.height - 430, 440, 430)
+        style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+        self.tasks_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            frame, style, NSBackingStoreBuffered, False)
+        self.tasks_window.setTitle_("当前任务")
+        self.tasks_window.setLevel_(NSStatusWindowLevel + 1)
+        self.tasks_window.setCollectionBehavior_(
+            NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary)
+        self.tasks_window.setReleasedWhenClosed_(False)
+        self.tasks_window.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.08, 0.10, 0.15, 1))
+        content = self.tasks_window.contentView()
+        self.tasks_count = self.label(content, "智能体状态", 13, 387, True, width=400)
+        scroll = NSScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 400, 350))
+        scroll.setHasVerticalScroller_(True)
+        self.tasks_text = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 400, 350))
+        self.tasks_text.setEditable_(False)
+        self.tasks_text.setSelectable_(True)
+        self.tasks_text.setFont_(typeface(12, NSFontWeightSemibold))
+        self.tasks_text.setTextColor_(NSColor.whiteColor())
+        self.tasks_text.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.08, 0.10, 0.15, 1))
+        scroll.setDocumentView_(self.tasks_text)
+        content.addSubview_(scroll)
+        self.refresh_tasks()
+        self.tasks_window.makeKeyAndOrderFront_(None)
+
+    @objc.python_method
+    def refresh_tasks(self):
+        decisions = self.ingestion.decisions(private=self.privacy, paused=self.paused)
+        needs_action = sum(decision.needs_action for decision in decisions)
+        if hasattr(self, "menu_tasks_item"):
+            self.menu_tasks_item.setTitle_(f"当前任务 · {needs_action} 项需处理")
+        if self.tasks_window is not None:
+            self.tasks_count.setStringValue_(f"当前任务 · {len(decisions)} 项 · {needs_action} 项需处理")
+            if self.privacy:
+                content = "隐私模式下不显示任务信息"
+            elif self.paused:
+                content = "弹幕已暂停；任务信息暂不显示"
+            else:
+                content = format_attention_rows(decisions)
+            self.tasks_text.setString_(content)
 
     @objc.python_method
     def build_history(self):
@@ -878,21 +936,22 @@ class Controller(NSObject):
 
     @objc.typedSelector(b"v@:@")
     def receive_(self, timer):
-        events = prioritize(drain(50))
+        events = drain(50)
         if events:
             self.sources.refresh()
-        for event in events:
-            if not self.sources.is_enabled(event["agent"]):
-                continue
-            self.live_count += 1
-            if (not self.paused and self.traffic_gate.show(event)
-                    and self.progress_gate.show(event, self.settings["progress"], self.settings["event_filter"])):
-                agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY", "wechat": "微信"}.get(
-                    event["agent"]) or self.sources.display_name(event["agent"]) or event["agent"].upper()
-                source = f"{agent} · {event['project']}" if event["project"] else agent
-                self.emit(source, event["message"], event["kind"], origin="真实",
-                          detail=event.get("detail", ""), agent_id=event["agent"],
-                          open_url=event.get("open_url", ""))
+        enabled = [event for event in events if self.sources.is_enabled(event["agent"])]
+        self.live_count += len(enabled)
+        for event in self.barrage.plan(enabled, private=self.privacy, paused=self.paused,
+                                       progress_mode=self.settings["progress"],
+                                       filter_mode=self.settings["event_filter"]):
+            agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY", "wechat": "微信"}.get(
+                event["agent"]) or self.sources.display_name(event["agent"]) or event["agent"].upper()
+            source = f"{agent} · {event['project']}" if event["project"] else agent
+            self.emit(source, event["message"], event["kind"], origin="真实",
+                      detail=event.get("detail", ""), agent_id=event["agent"],
+                      open_url=event.get("open_url", ""))
+        if events:
+            self.refresh_tasks()
         self.refresh()
 
     @objc.typedSelector(b"v@:@")
@@ -915,6 +974,7 @@ class Controller(NSObject):
         self.paused = not self.paused
         for canvas in self.canvases: canvas.paused = self.paused
         self.pause_button.setTitle_("继续" if self.paused else "暂停")
+        self.refresh_tasks()
         self.refresh()
 
     @objc.typedSelector(b"v@:@")
@@ -925,11 +985,14 @@ class Controller(NSObject):
         if self.privacy:
             self.history.clear()
             self.refresh_history()
+            self.ingestion.clear()
+            self.barrage.shown_attention.clear()
         for canvas in self.canvases:
             canvas.privacy = self.privacy
             canvas.items.clear()
             canvas.setNeedsDisplay_(True)
         self.privacy_button.setTitle_("隐私: 开" if self.privacy else "隐私模式")
+        self.refresh_tasks()
         self.refresh()
         self.emit("AGENT MARQUEE", "隐私模式已切换", "success", origin="系统")
 
@@ -940,6 +1003,14 @@ class Controller(NSObject):
         else:
             self.refresh_history()
             self.history_window.makeKeyAndOrderFront_(None)
+
+    @objc.typedSelector(b"v@:@")
+    def openTasks_(self, sender):
+        if self.tasks_window is None:
+            self.build_tasks()
+        else:
+            self.refresh_tasks()
+            self.tasks_window.makeKeyAndOrderFront_(None)
 
     @objc.typedSelector(b"v@:@")
     def openControl_(self, sender):

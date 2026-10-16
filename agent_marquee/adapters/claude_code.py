@@ -28,7 +28,7 @@ def normalize(payload):
     elif event == "SubagentStop":
         message, kind = "子任务已结束", "success"
     elif event == "Stop":
-        message, kind = "任务已完成，可以查看结果", "success"
+        message, kind = "本轮回应进入收尾，请查看任务", "success"
     elif event == "StopFailure":
         message, kind = "任务因错误停止", "error"
     elif event == "SessionEnd":

@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from .events import valid_event
+from .event_v2 import valid_event_v2
 
 # Keep the transport directory stable for already installed hook processes.
 SPOOL_DIR = Path(f"/tmp/agentbarrage-{os.getuid()}")
@@ -26,7 +27,7 @@ def ensure_spool():
 
 
 def publish(event):
-    if not valid_event(event):
+    if not (valid_event(event) or valid_event_v2(event)):
         return False
     data = json.dumps(event, ensure_ascii=False).encode("utf-8")
     if len(data) > MAX_EVENT_BYTES:
@@ -40,11 +41,22 @@ def publish(event):
         with os.fdopen(fd, "wb") as stream:
             stream.write(data)
         os.replace(temp, final)
-        if random.randrange(20) == 0:
+        if _pending_over_limit() or random.randrange(20) == 0:
             prune()
         return True
     except OSError:
         return False
+
+
+def _pending_over_limit():
+    with os.scandir(SPOOL_DIR) as entries:
+        count = 0
+        for entry in entries:
+            if entry.name.endswith(".json"):
+                count += 1
+                if count > MAX_PENDING_FILES:
+                    return True
+    return False
 
 
 def prune():
@@ -70,10 +82,14 @@ def drain(limit=30):
     events = []
     for path in paths:
         try:
-            if path.stat().st_size > MAX_EVENT_BYTES:
+            info = path.stat()
+            now = time.time()
+            if (info.st_size > MAX_EVENT_BYTES
+                    or abs(now - info.st_mtime) > MAX_AGE_SECONDS):
                 continue
             event = json.loads(path.read_text(encoding="utf-8"))
-            if valid_event(event) and time.time() - event.get("occurred_at", 0) <= MAX_AGE_SECONDS:
+            if ((valid_event(event) or valid_event_v2(event))
+                    and abs(now - event.get("occurred_at", 0)) <= MAX_AGE_SECONDS):
                 events.append(event)
         except (OSError, ValueError, TypeError):
             pass
