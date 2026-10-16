@@ -29,6 +29,11 @@ class IngestionTest(unittest.TestCase):
         ingestion.ingest(event, private=True, received_at=11)
         self.assertEqual(ingestion.decisions(now=12), [])
 
+    def test_invalid_replayed_event_is_rejected(self):
+        ingestion = IngestionEngine(started_at=20)
+        with self.assertRaises(ValueError):
+            ingestion.ingest({"occurred_at": 10, "agent": "codex"})
+
 
 if __name__ == "__main__":
     unittest.main()

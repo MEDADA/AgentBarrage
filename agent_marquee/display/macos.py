@@ -4,6 +4,7 @@ import argparse
 import random
 import shlex
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 import objc
@@ -260,7 +261,7 @@ class Controller(NSObject):
         self.progress_gate = ProgressGate()
         self.traffic_gate = TrafficGate()
         self.history = HistoryStore()
-        self.ingestion = IngestionEngine()
+        self.ingestion = IngestionEngine(started_at=time.time())
         self.settings = load_settings()
         self.sources = SourceRegistry()
         self.icons = IconResolver()

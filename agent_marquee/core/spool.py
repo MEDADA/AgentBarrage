@@ -41,11 +41,22 @@ def publish(event):
         with os.fdopen(fd, "wb") as stream:
             stream.write(data)
         os.replace(temp, final)
-        if random.randrange(20) == 0:
+        if _pending_over_limit() or random.randrange(20) == 0:
             prune()
         return True
     except OSError:
         return False
+
+
+def _pending_over_limit():
+    with os.scandir(SPOOL_DIR) as entries:
+        count = 0
+        for entry in entries:
+            if entry.name.endswith(".json"):
+                count += 1
+                if count > MAX_PENDING_FILES:
+                    return True
+    return False
 
 
 def prune():
