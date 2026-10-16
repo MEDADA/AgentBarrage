@@ -11,12 +11,12 @@ import objc
 from AppKit import *
 from Foundation import NSObject, NSString, NSTimer, NSURL
 from agent_marquee.core.spool import drain, ensure_spool
-from agent_marquee.core.event_v2 import as_display_event
 from agent_marquee.core.attention import format_attention_rows
 from agent_marquee.core.ingestion import IngestionEngine
+from agent_marquee.core.barrage import BarragePlanner
 from agent_marquee.core.history import HistoryStore
 from agent_marquee.core.progress import ProgressGate
-from agent_marquee.core.traffic import TrafficGate, prioritize
+from agent_marquee.core.traffic import TrafficGate
 from agent_marquee.core.settings import DEFAULT_SETTINGS, load_settings, save_settings
 from agent_marquee.core.sources import SourceRegistry, add_source, load_sources, remove_source, set_source_enabled, set_source_icon
 from agent_marquee.core.events import make_event
@@ -262,6 +262,7 @@ class Controller(NSObject):
         self.traffic_gate = TrafficGate()
         self.history = HistoryStore()
         self.ingestion = IngestionEngine(started_at=time.time())
+        self.barrage = BarragePlanner(self.ingestion, self.traffic_gate, self.progress_gate)
         self.settings = load_settings()
         self.sources = SourceRegistry()
         self.icons = IconResolver()
@@ -935,23 +936,20 @@ class Controller(NSObject):
 
     @objc.typedSelector(b"v@:@")
     def receive_(self, timer):
-        events = prioritize(drain(50))
+        events = drain(50)
         if events:
             self.sources.refresh()
-        for raw_event in events:
-            if not self.sources.is_enabled(raw_event["agent"]):
-                continue
-            self.ingestion.ingest(raw_event, private=self.privacy)
-            event = as_display_event(raw_event)
-            self.live_count += 1
-            if (not self.paused and self.traffic_gate.show(event)
-                    and self.progress_gate.show(event, self.settings["progress"], self.settings["event_filter"])):
-                agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY", "wechat": "微信"}.get(
-                    event["agent"]) or self.sources.display_name(event["agent"]) or event["agent"].upper()
-                source = f"{agent} · {event['project']}" if event["project"] else agent
-                self.emit(source, event["message"], event["kind"], origin="真实",
-                          detail=event.get("detail", ""), agent_id=event["agent"],
-                          open_url=event.get("open_url", ""))
+        enabled = [event for event in events if self.sources.is_enabled(event["agent"])]
+        self.live_count += len(enabled)
+        for event in self.barrage.plan(enabled, private=self.privacy, paused=self.paused,
+                                       progress_mode=self.settings["progress"],
+                                       filter_mode=self.settings["event_filter"]):
+            agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY", "wechat": "微信"}.get(
+                event["agent"]) or self.sources.display_name(event["agent"]) or event["agent"].upper()
+            source = f"{agent} · {event['project']}" if event["project"] else agent
+            self.emit(source, event["message"], event["kind"], origin="真实",
+                      detail=event.get("detail", ""), agent_id=event["agent"],
+                      open_url=event.get("open_url", ""))
         if events:
             self.refresh_tasks()
         self.refresh()
@@ -988,6 +986,7 @@ class Controller(NSObject):
             self.history.clear()
             self.refresh_history()
             self.ingestion.clear()
+            self.barrage.shown_attention.clear()
         for canvas in self.canvases:
             canvas.privacy = self.privacy
             canvas.items.clear()

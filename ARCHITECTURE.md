@@ -8,7 +8,7 @@
 Codex Hook ──────> codex adapter ───┐
 Claude Code Hook -> claude adapter ──┤
 CodeBuddy Hook ──> codebuddy adapter ─┼─> Event v1/v2 -> local spool -> overlay
-任意本机工具 ────> send CLI ─────────┤                    └─> ingestion -> task list
+任意本机工具 ────> send CLI ─────────┤                    └─> ingestion -> attention -> task list / barrage
 本机自动化 ──────> token HTTP bridge ─┤
 微信可见通知 ────> optional AX adapter ─┘ (只作通知)
 ```
@@ -23,6 +23,7 @@ CodeBuddy Hook ──> codebuddy adapter ─┼─> Event v1/v2 -> local spool -
 | `agent_marquee/core/registry.py` | 多来源会话隔离、去重、序号保护、过期健康标记 | Python 标准库 |
 | `agent_marquee/core/attention.py` | 确定性的需处理排序与任务列表文案 | Python 标准库 |
 | `agent_marquee/core/ingestion.py` | 接收、清空与读取状态的单一内核入口 | core |
+| `agent_marquee/core/barrage.py` | 按接收顺序更新状态，再按需处理优先级安排弹幕并合并重复提醒 | core |
 | `agent_marquee/core/spool.py` | 本机事件投递、短期缓存与过期清理 | Python 标准库 |
 | `agent_marquee/core/history.py` | 最近 200 条弹幕的内存历史、隐私清理 | Python 标准库 |
 | `agent_marquee/core/traffic.py` | 重复事件合并、普通事件限流及批次优先级 | Python 标准库 |
@@ -52,7 +53,7 @@ Event v2 是面向状态推导的观察事件，包含 `event_type`、`event_id`
 
 状态推导由纯函数 reducer 完成，按来源实例、会话和任务/轮次隔离。`Stop` 仅映射为 `turn_stop_observed`，不会宣称任务完成；`PermissionRequest` 只产生有 30 秒期限的“可能需要批准”，只有明确可见的批准请求事件才进入“需要批准”。工具结束不等于任务结束；会话结束让未终结任务回到“状态未确认”；事件过久未更新只标记为 stale，不推测阻塞。重复事件、旧序号和已结束会话的迟到事件不会重新推进状态。隐私模式清空内存任务状态，暂停时任务列表暂不展示。
 
-当前任务列表按明确的需批准、需输入、失败、待确认、完成和工作中排序。这份状态是本机事件的保守视图，不能替代源工具自身的任务状态。v2 的已完成、失败和取消事件需要来源提供可靠证据；现有 Hook 尚不自动发送“整项任务已完成”。程序重启前积压的有效事件仍能作为弹幕短通知播放，但不参与新进程的任务状态重建；只有启动后的新证据才能建立工作中状态。
+当前任务列表按明确的需批准、需输入、失败、待确认、完成和工作中排序。弹幕先按接收顺序更新状态，再优先显示当前仍成立的需处理决策；同一任务的重复需处理提醒会合并，普通进度仍受 TrafficGate / ProgressGate 控制。微信与无会话来源只走通知路径。这份状态是本机事件的保守视图，不能替代源工具自身的任务状态。v2 的已完成、失败和取消事件需要来源提供可靠证据；现有 Hook 尚不自动发送“整项任务已完成”。程序重启前积压的有效事件仍能作为弹幕短通知播放，但不参与新进程的任务状态重建；只有启动后的新证据才能建立工作中状态。
 
 ## 本机传输
 
