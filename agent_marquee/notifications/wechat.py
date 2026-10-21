@@ -16,9 +16,25 @@ def _text(value):
     return " ".join(value.split())[:160] if isinstance(value, str) else ""
 
 
-def _is_app_marker(value):
+def _is_bundle_marker(value):
     text = _text(value).lower()
-    return text in APP_NAMES or any(bundle in text for bundle in APP_IDENTIFIERS)
+    return any(bundle in text for bundle in APP_IDENTIFIERS)
+
+
+def _is_app_name(value):
+    return _text(value).lower() in APP_NAMES
+
+
+def _is_app_marker(value):
+    return _is_app_name(value) or _is_bundle_marker(value)
+
+
+def _node_ids(node):
+    return [
+        _text(node.get(key))
+        for key in ("identifier", "stackingidentifier")
+        if _text(node.get(key))
+    ]
 
 
 def _own_texts(node):
@@ -37,6 +53,27 @@ def _all_texts(node, limit=24):
     return result
 
 
+def _first_content_label(node):
+    """First non-chrome visible label on the node or its early children."""
+    for value in _own_texts(node):
+        if value.lower() not in CHROME_LABELS:
+            return value
+    for child in node.get("children", [])[:8]:
+        for value in _own_texts(child):
+            if value.lower() not in CHROME_LABELS:
+                return value
+    return ""
+
+
+def _identified_as_wechat(node):
+    ids = _node_ids(node)
+    for child in node.get("children", [])[:8]:
+        ids.extend(_node_ids(child))
+    if any(_is_bundle_marker(value) for value in ids):
+        return True
+    return _is_app_name(_first_content_label(node))
+
+
 def extract_notifications(tree):
     """Find the smallest groups that visibly identify themselves as WeChat."""
     found = []
@@ -50,14 +87,7 @@ def extract_notifications(tree):
                 child_found = True
         if child_found:
             return True
-        immediate = _own_texts(node) + [_text(node.get("identifier"))]
-        for child in node.get("children", [])[:4]:
-            label = _own_texts(child) + [_text(child.get("identifier"))]
-            if any(label):
-                immediate.extend(label)
-                break
-        identified = any(_is_app_marker(value) for value in immediate)
-        if not identified:
+        if not _identified_as_wechat(node):
             return False
         texts = [value for value in _all_texts(node) if not _is_app_marker(value)
                  and value.lower() not in CHROME_LABELS]

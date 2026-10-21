@@ -19,6 +19,8 @@ class WeChatNotificationWatcher:
         self.ignored_chats = set()
         self.thread = None
         self.recent = RecentNotifications()
+        self.error_count = 0
+        self.last_error = None
 
     def configure(self, preview_enabled=False, ignored_chats=()):
         with self.lock:
@@ -57,6 +59,8 @@ class WeChatNotificationWatcher:
         while not stop_event.is_set():
             try:
                 self.poll_once(stop_event)
-            except Exception:
-                pass  # Notification Center may restart or change its AX tree.
+            except Exception as exc:
+                # Notification Center may restart or change its AX tree.
+                self.error_count += 1
+                self.last_error = repr(exc)[:200]
             stop_event.wait(1.5)
