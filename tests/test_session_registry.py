@@ -73,7 +73,7 @@ class SessionRegistryTest(unittest.TestCase):
     def test_missing_identity_stays_notification_only(self):
         registry = SessionRegistry()
         self.assertIsNone(registry.ingest(signal("tool_started", session=""), received_at=10))
-        self.assertIsNone(registry.ingest(signal("notification", agent="wechat"), received_at=11))
+        self.assertIsNone(registry.ingest(signal("notification", agent="pager", session=""), received_at=11))
         self.assertEqual(registry.work_items(now=12), [])
 
     def test_stale_is_health_not_blocked_and_session_end_is_unknown(self):

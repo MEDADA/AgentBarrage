@@ -18,7 +18,6 @@ DEFAULT_SETTINGS = {
     "coverage": 0.42, "fixed_duration": 5, "show_icons": True,
     "event_filter": "全部类型",
     "screens": "所有屏幕", "reduce_motion": False,
-    "wechat_enabled": False, "wechat_preview": False, "wechat_ignored_chats": [],
 }
 CHOICES = {
     "style": {"胶囊", "轻盈", "纯文字"},
@@ -62,14 +61,6 @@ def sanitize_settings(saved):
         result["show_icons"] = saved["show_icons"]
     if type(saved.get("reduce_motion")) is bool:
         result["reduce_motion"] = saved["reduce_motion"]
-    for key in ("wechat_enabled", "wechat_preview"):
-        if type(saved.get(key)) is bool:
-            result[key] = saved[key]
-    ignored = saved.get("wechat_ignored_chats")
-    if isinstance(ignored, list):
-        result["wechat_ignored_chats"] = list(dict.fromkeys(
-            name.strip()[:32] for name in ignored[:20]
-            if isinstance(name, str) and name.strip()))
     return result
 
 

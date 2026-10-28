@@ -12,7 +12,7 @@ from .events import valid_agent
 from .migration import DATA_DIR, migrate_user_data
 
 SOURCES_PATH = DATA_DIR / "sources.json"
-BUILTIN_IDS = {"codex", "claude-code", "codebuddy", "wechat"}
+BUILTIN_IDS = {"codex", "claude-code", "codebuddy"}
 MAX_SOURCES = 50
 ICON_SUFFIXES = {".png", ".jpg", ".jpeg", ".icns"}
 MAX_ICON_BYTES = 2 * 1024 * 1024
@@ -161,19 +161,24 @@ def set_source_enabled(source_id, enabled, path=SOURCES_PATH):
 class SourceRegistry:
     def __init__(self, path=SOURCES_PATH):
         self.path = path
-        self._mtime = None
+        self._snapshot = None
         self._sources = {}
         self.refresh(force=True)
 
     def refresh(self, force=False):
+        # Compare bytes: some filesystems do not advance mtime for rapid writes.
         try:
-            mtime = self.path.stat().st_mtime_ns if self.path.exists() else None
-            if force or mtime != self._mtime:
-                self._sources = {item["id"]: item for item in load_sources(self.path)}
-                self._mtime = mtime
+            if not self.path.exists() or self.path.is_symlink():
+                snapshot = None
+            else:
+                snapshot = self.path.read_bytes()
+            if force or snapshot != self._snapshot:
+                self._sources = ({item["id"]: item for item in load_sources(self.path)}
+                                 if snapshot is not None else {})
+                self._snapshot = snapshot
         except (OSError, ValueError, TypeError):
             self._sources = {}
-            self._mtime = None
+            self._snapshot = None
 
     def display_name(self, source_id):
         item = self._sources.get(source_id)

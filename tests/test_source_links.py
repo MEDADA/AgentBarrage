@@ -31,6 +31,9 @@ class SourceLinksTest(unittest.TestCase):
         self.assertEqual(settings["screens"], "主屏幕")
         self.assertTrue(settings["reduce_motion"])
         self.assertEqual(sanitize_settings({"screens": "fake", "reduce_motion": "yes"})["screens"], "所有屏幕")
+        cleaned = sanitize_settings({"wechat_enabled": True, "wechat_preview": True,
+                                     "wechat_ignored_chats": ["工作群"]})
+        self.assertFalse(any(key.startswith("wechat_") for key in cleaned))
 
 
 if __name__ == "__main__":

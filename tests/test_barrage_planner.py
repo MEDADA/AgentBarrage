@@ -53,7 +53,7 @@ class BarragePlannerTest(unittest.TestCase):
         self.assertEqual(self.planner.plan([event], progress_mode="全部", now=12), [])
 
     def test_sessionless_notification_keeps_legacy_display_path(self):
-        notice = make_event_v2("wechat", "notification", "新消息",
+        notice = make_event_v2("pager", "notification", "新消息",
                                session_id="", presentation_kind="attention")
         shown = self.planner.plan([notice], now=10)
         self.assertEqual([entry["message"] for entry in shown], ["新消息"])

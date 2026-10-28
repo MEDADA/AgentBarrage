@@ -25,7 +25,7 @@ class BarragePlanner:
             event_type = raw.get("event_type") or LEGACY_EVENT_TYPES.get(raw.get("event"))
             replayed = (self.ingestion.started_at is not None
                         and raw.get("occurred_at", 0) < self.ingestion.started_at)
-            notification_only = (not raw.get("session_id") or raw["agent"] == "wechat"
+            notification_only = (not raw.get("session_id")
                                  or event_type in {"session_started", "session_ended"}
                                  or replayed)
             if item is None and not notification_only:

@@ -22,8 +22,6 @@ from agent_marquee.core.sources import SourceRegistry, add_source, load_sources,
 from agent_marquee.core.events import make_event
 from agent_marquee.core.spool import publish
 from agent_marquee.install import CONFIG_PATHS, apply_agent, integration_status
-from agent_marquee.notifications.macos_ax import accessibility_trusted
-from agent_marquee.notifications.watcher import WeChatNotificationWatcher
 from .icons import IconResolver
 
 INTEGRATIONS = [
@@ -272,11 +270,6 @@ class Controller(NSObject):
         self.tasks_window = None
         self.integration_window = None
         self.custom_window = None
-        self.notification_window = None
-        self.wechat_watcher = WeChatNotificationWatcher()
-        self.wechat_watcher.configure(self.settings["wechat_preview"], self.settings["wechat_ignored_chats"])
-        if self.settings["wechat_enabled"]:
-            self.wechat_watcher.start()
         ensure_spool()
         self.build_overlays()
         self.build_controls()
@@ -333,8 +326,6 @@ class Controller(NSObject):
             reduce_motion = self.settings["reduce_motion"] or system_reduce_motion()
             for canvas in self.canvases:
                 canvas.reduce_motion = reduce_motion
-        if self.notification_window is not None and self.notification_window.isVisible():
-            self.refresh_notification_status()
         self.refresh_tasks()
 
     @objc.python_method
@@ -388,7 +379,7 @@ class Controller(NSObject):
             self.privacy_button = self.button(content, "隐私模式", 100, "togglePrivacy:", 232, 98)
         else:
             self.label(content, "AGENT MARQUEE", 19, 195, True)
-            self.label(content, "监听本机智能体事件与应用通知", 11, 170)
+            self.label(content, "监听本机智能体事件", 11, 170)
             self.status = self.label(content, "● 等待智能体事件", 12, 140)
             self.pause_button = self.button(content, "暂停", 98, "togglePause:", 20, 150)
             self.privacy_button = self.button(content, "隐私模式", 98, "togglePrivacy:", 180, 150)
@@ -409,8 +400,7 @@ class Controller(NSObject):
                               ("弹幕设置", "openSettings:"),
                               ("当前任务", "openTasks:"),
                               ("历史记录", "openHistory:"),
-                              ("智能体接入", "openIntegrations:"),
-                              ("微信通知", "openNotifications:")):
+                              ("智能体接入", "openIntegrations:")):
             shortcut = "t" if action == "openTasks:" else ""
             item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, shortcut)
             item.setTarget_(self)
@@ -532,8 +522,7 @@ class Controller(NSObject):
             install.setTag_(index)
             remove = self.button(content, "卸载", y - 57, "removeIntegration:", 225, 195)
             remove.setTag_(index)
-        self.button(content, "添加或管理其他来源", 30, "openCustomSources:", 20, 205)
-        self.button(content, "微信通知", 30, "openNotifications:", 235, 205)
+        self.button(content, "添加或管理其他来源", 30, "openCustomSources:", 20, 420)
         self.label(content, "安装后请按各工具要求完成 Hook 信任审查", 10, 3, width=420)
         self.refresh_integrations()
         self.integration_window.makeKeyAndOrderFront_(None)
@@ -798,61 +787,6 @@ class Controller(NSObject):
         self.settings_window.makeKeyAndOrderFront_(None)
 
     @objc.python_method
-    def build_notifications(self):
-        main = self.control.frame()
-        frame = NSMakeRect(main.origin.x - 460, main.origin.y + main.size.height - 340, 440, 340)
-        style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
-        self.notification_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            frame, style, NSBackingStoreBuffered, False)
-        self.notification_window.setTitle_("微信通知")
-        self.notification_window.setLevel_(NSStatusWindowLevel + 1)
-        self.notification_window.setCollectionBehavior_(
-            NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary)
-        self.notification_window.setReleasedWhenClosed_(False)
-        self.notification_window.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.08, 0.10, 0.15, 1))
-        content = self.notification_window.contentView()
-        self.label(content, "个人微信 Mac 客户端", 17, 295, True, width=400)
-        self.label(content, "读取 macOS 已显示的通知；此功能默认关闭", 11, 270, width=400)
-        self.wechat_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(20, 225, 390, 26))
-        self.wechat_checkbox.setButtonType_(NSSwitchButton)
-        self.wechat_checkbox.setTitle_("将微信新消息显示为弹幕")
-        self.wechat_checkbox.setState_(NSControlStateValueOn if self.settings["wechat_enabled"] else NSControlStateValueOff)
-        self.wechat_checkbox.setTarget_(self)
-        self.wechat_checkbox.setAction_("notificationSettingsChanged:")
-        content.addSubview_(self.wechat_checkbox)
-        self.wechat_preview_checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(20, 191, 390, 26))
-        self.wechat_preview_checkbox.setButtonType_(NSSwitchButton)
-        self.wechat_preview_checkbox.setTitle_("显示发送人和通知预览（可能包含私人内容）")
-        self.wechat_preview_checkbox.setState_(NSControlStateValueOn if self.settings["wechat_preview"] else NSControlStateValueOff)
-        self.wechat_preview_checkbox.setTarget_(self)
-        self.wechat_preview_checkbox.setAction_("notificationSettingsChanged:")
-        content.addSubview_(self.wechat_preview_checkbox)
-        self.label(content, "忽略会话名称（逗号分隔）", 11, 150, width=400)
-        self.wechat_ignored_field = NSTextField.alloc().initWithFrame_(NSMakeRect(20, 119, 400, 27))
-        self.wechat_ignored_field.setPlaceholderString_("例如：工作群, 家庭群")
-        self.wechat_ignored_field.setStringValue_(", ".join(self.settings["wechat_ignored_chats"]))
-        self.wechat_ignored_field.setTarget_(self)
-        self.wechat_ignored_field.setAction_("notificationSettingsChanged:")
-        self.wechat_ignored_field.setDelegate_(self)
-        content.addSubview_(self.wechat_ignored_field)
-        self.wechat_permission_status = self.label(content, "检查中", 11, 79, width=400)
-        self.button(content, "请求辅助功能权限", 31, "requestAccessibility:", 20, 195)
-        self.button(content, "测试微信弹幕", 31, "testWeChatNotification:", 225, 195)
-        self.wechat_preview_checkbox.setEnabled_(self.settings["wechat_enabled"])
-        self.refresh_notification_status()
-        self.notification_window.makeKeyAndOrderFront_(None)
-
-    @objc.python_method
-    def refresh_notification_status(self):
-        if not self.settings["wechat_enabled"]:
-            value = "状态：已关闭；不读取通知"
-        elif accessibility_trusted():
-            value = "状态：已授权；等待微信新通知（仅处理可见通知）"
-        else:
-            value = "状态：需要在系统设置中授予辅助功能权限"
-        self.wechat_permission_status.setStringValue_(value)
-
-    @objc.python_method
     def popup(self, content, values, selected, y, x=119, width=251):
         control = NSPopUpButton.alloc().initWithFrame_pullsDown_(NSMakeRect(x, y, width, 28), False)
         control.addItemsWithTitles_(values)
@@ -944,7 +878,7 @@ class Controller(NSObject):
         for event in self.barrage.plan(enabled, private=self.privacy, paused=self.paused,
                                        progress_mode=self.settings["progress"],
                                        filter_mode=self.settings["event_filter"]):
-            agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY", "wechat": "微信"}.get(
+            agent = {"codex": "CODEX", "claude-code": "CLAUDE CODE", "codebuddy": "CODEBUDDY"}.get(
                 event["agent"]) or self.sources.display_name(event["agent"]) or event["agent"].upper()
             source = f"{agent} · {event['project']}" if event["project"] else agent
             self.emit(source, event["message"], event["kind"], origin="真实",
@@ -980,8 +914,6 @@ class Controller(NSObject):
     @objc.typedSelector(b"v@:@")
     def togglePrivacy_(self, sender):
         self.privacy = not self.privacy
-        self.wechat_watcher.configure(self.settings["wechat_preview"] and not self.privacy,
-                                      self.settings["wechat_ignored_chats"])
         if self.privacy:
             self.history.clear()
             self.refresh_history()
@@ -1019,7 +951,6 @@ class Controller(NSObject):
 
     @objc.typedSelector(b"v@:@")
     def quitApp_(self, sender):
-        self.wechat_watcher.stop()
         NSApp().terminate_(None)
 
     @objc.typedSelector(b"v@:@")
@@ -1179,48 +1110,6 @@ class Controller(NSObject):
             self.settings_window.makeKeyAndOrderFront_(None)
 
     @objc.typedSelector(b"v@:@")
-    def openNotifications_(self, sender):
-        if self.notification_window is None:
-            self.build_notifications()
-        else:
-            self.refresh_notification_status()
-            self.notification_window.makeKeyAndOrderFront_(None)
-
-    @objc.typedSelector(b"v@:@")
-    def notificationSettingsChanged_(self, sender):
-        enabled = self.wechat_checkbox.state() == NSControlStateValueOn
-        preview = self.wechat_preview_checkbox.state() == NSControlStateValueOn
-        ignored = [name.strip() for name in self.wechat_ignored_field.stringValue().split(",") if name.strip()]
-        self.settings.update({"wechat_enabled": enabled, "wechat_preview": preview,
-                              "wechat_ignored_chats": ignored})
-        save_settings(self.settings)
-        self.settings = load_settings()
-        self.wechat_watcher.configure(self.settings["wechat_preview"] and not self.privacy,
-                                      self.settings["wechat_ignored_chats"])
-        if enabled:
-            self.wechat_watcher.start()
-        else:
-            self.wechat_watcher.stop()
-        self.wechat_preview_checkbox.setEnabled_(enabled)
-        self.refresh_notification_status()
-
-    def controlTextDidEndEditing_(self, notification):
-        if (self.notification_window is not None
-                and notification.object() is self.wechat_ignored_field):
-            self.notificationSettingsChanged_(self.wechat_ignored_field)
-
-    @objc.typedSelector(b"v@:@")
-    def requestAccessibility_(self, sender):
-        accessibility_trusted(prompt=True)
-        NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_(
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"))
-        self.refresh_notification_status()
-
-    @objc.typedSelector(b"v@:@")
-    def testWeChatNotification_(self, sender):
-        self.emit("微信", "有新消息", "attention", origin="预览", agent_id="wechat")
-
-    @objc.typedSelector(b"v@:@")
     def settingsChanged_(self, sender):
         self.refresh_slider_values()
         self.refresh_outline_controls()
@@ -1246,9 +1135,6 @@ class Controller(NSObject):
             "event_filter": self.filter_popup.titleOfSelectedItem(),
             "content": self.content_popup.titleOfSelectedItem(),
             "progress": self.progress_popup.titleOfSelectedItem(),
-            "wechat_enabled": self.settings["wechat_enabled"],
-            "wechat_preview": self.settings["wechat_preview"],
-            "wechat_ignored_chats": self.settings["wechat_ignored_chats"],
         }
         save_settings(self.settings)
         self.rebuild_overlays()
