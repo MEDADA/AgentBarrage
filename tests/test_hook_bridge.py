@@ -248,6 +248,18 @@ class HookBridgeTest(unittest.TestCase):
             self.assertTrue(load_sources(path)[0]["enabled"])
             self.assertIsNone(load_sources(path)[0]["icon"])
 
+    def test_registry_refresh_sees_rapid_enable_toggle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sources.json"
+            add_source("my-chat", "我的 AI 对话", path)
+            registry = SourceRegistry(path)
+            set_source_enabled("my-chat", False, path)
+            registry.refresh()
+            self.assertFalse(registry.is_enabled("my-chat"))
+            set_source_enabled("my-chat", True, path)
+            registry.refresh()
+            self.assertTrue(registry.is_enabled("my-chat"))
+
     def test_local_bridge_requires_token_and_registered_source(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sources.json"

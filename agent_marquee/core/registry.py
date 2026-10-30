@@ -29,7 +29,7 @@ class SessionRegistry:
         event = from_v1(raw_event) if raw_event.get("version") == 1 else raw_event
         if not valid_event_v2(event):
             raise ValueError("invalid canonical event")
-        if event["agent"] == "wechat" or not event.get("session_id"):
+        if not event.get("session_id"):
             return None
         source = (event["agent"], event.get("source_instance", ""))
         dedup_key = (*source, event["event_id"])
